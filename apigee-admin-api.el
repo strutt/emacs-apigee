@@ -109,6 +109,7 @@ https://docs.apigee.com/api-platform/system-administration/management-api-tokens
         (url (format "https://api.enterprise.apigee.com/v1/organizations/%s/%s"
                      apigee-admin-api-organization
                      endpoint)))
+    (message url)
     (with-current-buffer
         ;; Try to refresh token and try again if we have an error
         ;; thrown, this could be improved.
@@ -145,10 +146,59 @@ https://docs.apigee.com/api-platform/system-administration/management-api-tokens
   (apigee-admin-api--get (format "environments/%s/deployments" environment)))
 
 
+;; APIs
+(defun apigee-admin-api--get-api (api)
+  "Get environment names for `apigee-admin-api-organisation'."
+  (apigee-admin-api--get (format "apis/%s" api)))
+
+
+
 ;; KVMs
-(defun apigee-admin-api--list-kvms-for-api-proxy (api)
+(cl-defun apigee-admin-api--list-kvms (&optional
+                                       &key
+                                       api
+                                       environment
+                                       organization
+                                       &allow_other_keys)
+  "Get KeyValueMap for scope.
+
+The scope is indicated by choice of key: API, ENVIRONMENT,
+ORGANIZATION.  If passed multiple keys we prefer the lowest
+scope: API, then ENVIRONMENT, then ORGANIZATION.  The
+organization value is ignored as `apigee-admin-api-organization'
+is used."
+  (cond (api
+         (apigee-admin-api--get (format "apis/%s/keyvaluemaps" api)))
+        (environment
+         (apigee-admin-api--get (format "environments/%s/keyvaluemaps" environment)))
+        (organization
+         (apigee-admin-api--get (format "keyvaluemaps" apigee-admin-api-organization)))))
+
+(cl-defun apigee-admin-api--get-kvm (kvm
+                                     &optional
+                                     &key
+                                     api
+                                     environment
+                                     organization
+                                     &allow_other_keys)
+  "Get KeyValueMap KVM.
+
+The scope is indicated by choice of key: API, ENVIRONMENT,
+ORGANIZATION.  If passed multiple keys we prefer the lowest
+scope: API, then ENVIRONMENT, then ORGANIZATION. organization value is ignored as `apigee-admin-api-organization'
+is used."
+  (cond (api
+         (apigee-admin-api--get (format "apis/%s/keyvaluemaps/%s" api kvm)))
+        (environment
+         (apigee-admin-api--get (format "environments/%s/keyvaluemaps/%s" environment kvm)))
+        (organization
+         (apigee-admin-api--get (format "keyvaluemaps/%s" kvm)))))
+
+
+;; Keystores/truststores
+(defun apigee-admin-api--list-keystores (api)
   "Get KeyValueMap deployed for API `apigee-admin-api-organisation'."
-  (apigee-admin-api--get (format "apis/%s/keyvaluemaps" api)))
+  (apigee-admin-api--get (format "apis/%s/" api)))
 
 
 
