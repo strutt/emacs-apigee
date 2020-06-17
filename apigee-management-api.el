@@ -1,4 +1,4 @@
-;;; apigee-admin-api.el --- Use the apigee admin API     -*- lexical-binding: t; -*-
+;;; apigee-management-api.el --- Use the apigee admin API     -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2020  Ben Strutt
 
@@ -24,17 +24,17 @@
 
 ;;; Code:
 
-(defvar apigee-admin-api-organization nil "Your organization, used in API calls.")
-(defvar apigee-admin-api--access-token nil "Current access token.")
-(defvar apigee-admin-api--refresh-token nil "Current refresh token.")
+(defvar apigee-management-api-organization nil "Your organization, used in API calls.")
+(defvar apigee-management-api--access-token nil "Current access token.")
+(defvar apigee-management-api--refresh-token nil "Current refresh token.")
 
-(defconst apigee-admin-api--request-extra-headers
+(defconst apigee-management-api--request-extra-headers
   '(("content-type" . "application/x-www-form-urlencoded;charset=utf-8")
     ("accept" . "application/json;charset=utf-8")
     ("authorization" . "Basic ZWRnZWNsaTplZGdlY2xpc2VjcmV0"))
   "Extra headers for `url-retrieve'.")
 
-(defun apigee-admin-api--response-data ()
+(defun apigee-management-api--response-data ()
   "Read the response data in the current buffer."
   (save-excursion
     (goto-char (point-min)) ;; unnecessary?
@@ -43,30 +43,30 @@
       (search-forward "\n\n") ;; Find the blank line
       (json-read))))
 
-(defun apigee-admin-api--set-tokens ()
-  "Set `apigee-admin-api--access-token' and `apigee-amin--refresh-token'."
-  (let ((data (apigee-admin-api--response-data)))
-    (setq apigee-admin-api--access-token (alist-get 'access_token data))
-    (setq apigee-admin-api--refresh-token (alist-get 'refresh_token data))))
+(defun apigee-management-api--set-tokens ()
+  "Set `apigee-management-api--access-token' and `apigee-amin--refresh-token'."
+  (let ((data (apigee-management-api--response-data)))
+    (setq apigee-management-api--access-token (alist-get 'access_token data))
+    (setq apigee-management-api--refresh-token (alist-get 'refresh_token data))))
 
-(defun apigee-admin-api--refresh-access-token ()
+(defun apigee-management-api--refresh-access-token ()
   "Get."
 
-  (unless apigee-admin-api--refresh-token
+  (unless apigee-management-api--refresh-token
     (user-error "Cannot refresh access token without refresh token")
     )
 
   (let ((url "https://login.apigee.com/oauth/token")
         (url-request-data (format "grant_type=refresh_token&refresh_token=%s"
-                                  apigee-admin-api--refresh-token))
+                                  apigee-management-api--refresh-token))
         (url-request-method "POST")
-        (url-request-extra-headers apigee-admin-api--request-extra-headers))
+        (url-request-extra-headers apigee-management-api--request-extra-headers))
       (with-current-buffer
           (url-retrieve-synchronously url)
-        (apigee-admin-api--set-tokens))))
+        (apigee-management-api--set-tokens))))
 
-(defun apigee-admin-api--get-new-access-token ()
-  "Get and set `apigee-admin-api--access-token' and `apigee-amin--refresh-token'.
+(defun apigee-management-api--get-new-access-token ()
+  "Get and set `apigee-management-api--access-token' and `apigee-amin--refresh-token'.
 
 Searches your auth-sources for username/password for
 login.apigee.com, prompts for them if that search fails.  Prompts
@@ -88,26 +88,26 @@ https://docs.apigee.com/api-platform/system-administration/management-api-tokens
                                     user
                                     secret))
           (url-request-method "POST")
-          (url-request-extra-headers apigee-admin-api--request-extra-headers))
+          (url-request-extra-headers apigee-management-api--request-extra-headers))
       (with-current-buffer
           (url-retrieve-synchronously url)
-        (apigee-admin-api--set-tokens)))))
+        (apigee-management-api--set-tokens)))))
 
 
-(defun apigee-admin-api--access-token ()
+(defun apigee-management-api--access-token ()
   "Call the OAuth2 API to get an access token if we don't have one."
-  (unless apigee-admin-api--access-token
-    (apigee-admin-api--get-new-access-token))
-  apigee-admin-api--access-token)
+  (unless apigee-management-api--access-token
+    (apigee-management-api--get-new-access-token))
+  apigee-management-api--access-token)
 
-(defun apigee-admin-api--get (endpoint)
+(defun apigee-management-api--get (endpoint)
   "Read the data from ENDPOINT."
-  (unless apigee-admin-api-organization
-    (user-error "Please set apigee-admin-api-organization"))
+  (unless apigee-management-api-organization
+    (user-error "Please set apigee-management-api-organization"))
   
-  (let ((url-request-extra-headers `(("authorization" . ,(format "Bearer %s" (apigee-admin-api--access-token)))))
+  (let ((url-request-extra-headers `(("authorization" . ,(format "Bearer %s" (apigee-management-api--access-token)))))
         (url (format "https://api.enterprise.apigee.com/v1/organizations/%s/%s"
-                     apigee-admin-api-organization
+                     apigee-management-api-organization
                      endpoint)))
     (message url)
     (with-current-buffer
@@ -116,45 +116,45 @@ https://docs.apigee.com/api-platform/system-administration/management-api-tokens
         (condition-case nil
             (url-retrieve-synchronously url)
           (error nil
-                 (apigee-admin-api--refresh-access-token)
-                 (setq url-request-extra-headers `(("authorization" . ,(format "Bearer %s" (apigee-admin-api--access-token)))))
+                 (apigee-management-api--refresh-access-token)
+                 (setq url-request-extra-headers `(("authorization" . ,(format "Bearer %s" (apigee-management-api--access-token)))))
                  (url-retrieve-synchronously url)))
-      (let ((response-data (apigee-admin-api--response-data)))
+      (let ((response-data (apigee-management-api--response-data)))
         (when (string-match-p "*http" (buffer-name))
           (kill-buffer (current-buffer)))
         response-data))))
 
-;; (defun apigee-admin-api--apiproducts ()
+;; (defun apigee-management-api--apiproducts ()
 ;;   "List API products."
-;;   (apigee-admin-api--get "apiproducts"))
+;;   (apigee-management-api--get "apiproducts"))
 
 
 
 ;; Environment API calls
 ;; https://apidocs.apigee.com/api/environments
 
-(defun apigee-admin-api--get-environment-names ()
-  "Get environment names for `apigee-admin-api-organisation'."
-  (apigee-admin-api--get "environments"))
+(defun apigee-management-api--get-environment-names ()
+  "Get environment names for `apigee-management-api-organisation'."
+  (apigee-management-api--get "environments"))
 
-(defun apigee-admin-api--get-environment-details (environment)
-  "Get ENVIRONMENT details for `apigee-admin-api-organisation'."
-  (apigee-admin-api--get (format "environments/%s" )))
+(defun apigee-management-api--get-environment-details (environment)
+  "Get ENVIRONMENT details for `apigee-management-api-organisation'."
+  (apigee-management-api--get (format "environments/%s" )))
 
-(defun apigee-admin-api--get-apis-deployed-to-environment (environment)
-  "Get APIs deployed to ENVIRONMENT for `apigee-admin-api-organisation'."
-  (apigee-admin-api--get (format "environments/%s/deployments" environment)))
+(defun apigee-management-api--get-apis-deployed-to-environment (environment)
+  "Get APIs deployed to ENVIRONMENT for `apigee-management-api-organisation'."
+  (apigee-management-api--get (format "environments/%s/deployments" environment)))
 
 
 ;; APIs
-(defun apigee-admin-api--get-api (api)
-  "Get environment names for `apigee-admin-api-organisation'."
-  (apigee-admin-api--get (format "apis/%s" api)))
+(defun apigee-management-api--get-api (api)
+  "Get environment names for `apigee-management-api-organisation'."
+  (apigee-management-api--get (format "apis/%s" api)))
 
 
 
 ;; KVMs
-(cl-defun apigee-admin-api--list-kvms (&optional
+(cl-defun apigee-management-api--list-kvms (&optional
                                        &key
                                        api
                                        environment
@@ -165,16 +165,16 @@ https://docs.apigee.com/api-platform/system-administration/management-api-tokens
 The scope is indicated by choice of key: API, ENVIRONMENT,
 ORGANIZATION.  If passed multiple keys we prefer the lowest
 scope: API, then ENVIRONMENT, then ORGANIZATION.  The
-organization value is ignored as `apigee-admin-api-organization'
+organization value is ignored as `apigee-management-api-organization'
 is used."
   (cond (api
-         (apigee-admin-api--get (format "apis/%s/keyvaluemaps" api)))
+         (apigee-management-api--get (format "apis/%s/keyvaluemaps" api)))
         (environment
-         (apigee-admin-api--get (format "environments/%s/keyvaluemaps" environment)))
+         (apigee-management-api--get (format "environments/%s/keyvaluemaps" environment)))
         (organization
-         (apigee-admin-api--get (format "keyvaluemaps" apigee-admin-api-organization)))))
+         (apigee-management-api--get (format "keyvaluemaps" apigee-management-api-organization)))))
 
-(cl-defun apigee-admin-api--get-kvm (kvm
+(cl-defun apigee-management-api--get-kvm (kvm
                                      &optional
                                      &key
                                      api
@@ -185,24 +185,24 @@ is used."
 
 The scope is indicated by choice of key: API, ENVIRONMENT,
 ORGANIZATION.  If passed multiple keys we prefer the lowest
-scope: API, then ENVIRONMENT, then ORGANIZATION. organization value is ignored as `apigee-admin-api-organization'
+scope: API, then ENVIRONMENT, then ORGANIZATION. organization value is ignored as `apigee-management-api-organization'
 is used."
   (cond (api
-         (apigee-admin-api--get (format "apis/%s/keyvaluemaps/%s" api kvm)))
+         (apigee-management-api--get (format "apis/%s/keyvaluemaps/%s" api kvm)))
         (environment
-         (apigee-admin-api--get (format "environments/%s/keyvaluemaps/%s" environment kvm)))
+         (apigee-management-api--get (format "environments/%s/keyvaluemaps/%s" environment kvm)))
         (organization
-         (apigee-admin-api--get (format "keyvaluemaps/%s" kvm)))))
+         (apigee-management-api--get (format "keyvaluemaps/%s" kvm)))))
 
 
 ;; Keystores/truststores
-(defun apigee-admin-api--list-keystores (api)
-  "Get KeyValueMap deployed for API `apigee-admin-api-organisation'."
-  (apigee-admin-api--get (format "apis/%s/" api)))
+(defun apigee-management-api--list-keystores (api)
+  "Get KeyValueMap deployed for API `apigee-management-api-organisation'."
+  (apigee-management-api--get (format "apis/%s/" api)))
 
 
 
-(provide 'apigee-admin-api)
-;;; apigee-admin-api.el ends here
+(provide 'apigee-management-api)
+;;; apigee-management-api.el ends here
 
 

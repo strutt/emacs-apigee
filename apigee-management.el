@@ -1,6 +1,6 @@
 ;; TODO
 
-(require 'apigee-admin-api)
+(require 'apigee-management-api)
 (require 'apigee-management-kvms)
 
 (defun apigee-management--list-key-value-maps ()
@@ -8,15 +8,15 @@
     ;; aref indices must match `tabulated-list-format'
   (let* ((api-name (aref (tabulated-list-get-entry) 2))
          (api-kvms (mapcar (lambda (kvm-name)
-                             (apigee-admin-api--get-kvm kvm-name :api api-name))
-                           (apigee-admin-api--list-kvms :api api-name)))
+                             (apigee-management-api--get-kvm kvm-name :api api-name))
+                           (apigee-management-api--list-kvms :api api-name)))
          (environment (aref (tabulated-list-get-entry) 1))
          (env-kvms (mapcar (lambda (kvm-name)
-                             (apigee-admin-api--get-kvm kvm-name :environment environment))
-                           (apigee-admin-api--list-kvms :environment environment)))
+                             (apigee-management-api--get-kvm kvm-name :environment environment))
+                           (apigee-management-api--list-kvms :environment environment)))
          (org-kvms (mapcar (lambda (kvm-name)
-                             (apigee-admin-api--get-kvm kvm-name :organization nil))
-                           (apigee-admin-api--list-kvms :organization nil))))
+                             (apigee-management-api--get-kvm kvm-name :organization nil))
+                           (apigee-management-api--list-kvms :organization nil))))
 
     (apigee-management-kvms api-kvms env-kvms org-kvms api-name environment)))
 
@@ -31,7 +31,7 @@
          (api-names (mapcar (lambda (proxy)
                               (alist-get 'name proxy))
                             (alist-get 'aPIProxy env-apis)))
-         (apis (mapcar 'apigee-admin-api--get-api api-names))
+         (apis (mapcar 'apigee-management-api--get-api api-names))
          (api-last-modified-ats (mapcar (lambda (api)
                                           (apigee-management--api-metadata-timestamp-to-string
                                            (alist-get 'lastModifiedAt (alist-get 'metaData api))))
@@ -55,16 +55,16 @@
 (defun apigee-management ()
   "Entrypoint apigee management."
   (interactive)
-  (let* ((environments (apigee-admin-api--get-environment-names))
+  (let* ((environments (apigee-management-api--get-environment-names))
          (apis (mapcar
-                'apigee-admin-api--get-apis-deployed-to-environment
+                'apigee-management-api--get-apis-deployed-to-environment
                 environments))
          (rows-list (mapcar
                      'apigee-management--api-to-table-row
                      apis))
          (rows (apply 'append rows-list))
          )
-    (pop-to-buffer (format "*apigee management: %s*" apigee-admin-api-organization))
+    (pop-to-buffer (format "*apigee management: %s*" apigee-management-api-organization))
     (apigee-management-mode)
     (setq tabulated-list-entries rows)
     (tabulated-list-print t))
