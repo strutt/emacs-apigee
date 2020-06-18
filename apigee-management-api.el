@@ -24,8 +24,13 @@
 
 ;;; Code:
 (require 'cl-lib)
+(require 'auth-source)
+(require 'json)
 
-(defvar apigee-management-api-organization nil "Your organization, used in API calls.")
+(defcustom apigee-management-api-organization nil "Your organization, used in API calls.")
+(defcustom apigee-management-api-send-data-confirm t
+  "Confirm before sending data.  Set to nil to disable.")
+
 (defvar apigee-management-api--access-token nil "Current access token.")
 (defvar apigee-management-api--refresh-token nil "Current refresh token.")
 
@@ -103,10 +108,10 @@ https://docs.apigee.com/api-platform/system-administration/management-api-tokens
     (apigee-management-api--new-access-token))
   apigee-management-api--access-token)
 
-(cl-defun apigee-management-api--request (&key
-                                          endpoint
+(cl-defun apigee-management-api--request (endpoint
+                                          &key
                                           callback
-                                          body
+                                          data
                                           (method "GET"))
   "Make a request to ENDPOINT.
 
@@ -115,17 +120,17 @@ The backbone of `apigee-management-api'.
 METHOD should be a string representing an HTTP verb,
 e.g. \"GET\", \"POST\", \"PUT\".  Default is \"GET\".
 
-BODY will be `json-encode'd and put in the request body for
+DATA will be `json-encode'd and put in the request body for
 \"POST\" and \"PUT\" requests.
 
 If CALLBACK is provided then endpoint is retrieved asynchronously
 calling CALLBACK with the emacs-lispified JSON data returned."
   (unless apigee-management-api-organization
     (user-error "Please set apigee-management-api-organization"))
-  (message "Endpoint: %s" endpoint)
-  
+
   (let* ((url-request-method method)
-         (url-request-data body)
+         (url-request-data (unless (string-equal method "GET")
+                             (json-encode data)))
          (url-request-extra-headers `(("authorization" . ,(format "Bearer %s" (apigee-management-api--access-token)))
                                       ("content-type" . "application/json")))
          (url (format "https://api.enterprise.apigee.com/v1/organizations/%s/%s"
@@ -140,58 +145,57 @@ calling CALLBACK with the emacs-lispified JSON data returned."
                              (apply callback (list response-data)))
                            response-data)))
          (url-func-args (if callback `(,url ,url-callback) `(,url))))
-    (message url)
-    (with-current-buffer
-        ;; Try to refresh token and try again if we have an error
-        ;; thrown, this could be improved.
-        ;; TODO make this work in both sync + async cases!
-        (condition-case nil
-            (apply url-func url-func-args)
-          (error nil
-                 (apigee-management-api--refresh-access-token)
-                 (setq url-request-extra-headers `(("authorization" . ,(format "Bearer %s" (apigee-management-api--access-token)))
-                                                   ("content-type" . "application/json")))
-                 (apply url-func url-func-args)
-                 (url-retrieve-synchronously url)))
-      (when (eq url-func 'url-retrieve-synchronously)
-        (apply url-callback nil nil)))))
 
-;; (defun apigee-management-api--apiproducts ()
-;;   "List API products."
-;;   (apigee-management-api--request :endpoint "apiproducts"))
-
+    (when (or (not url-request-data) ;; No need to confirm if there's no body
+              ;; only ask y-or-n-p if apigee-management-api-send-data-confirm is non-nil.
+              (not apigee-management-api-send-data-confirm)
+              (y-or-n-p (format "%s %s to %s? " method url-request-data url)))
+      (with-current-buffer
+          ;; Try to refresh token and try again if we have an error
+          ;; thrown, this could be improved.
+          ;; TODO make this work in both sync + async cases!
+          (condition-case nil
+              (apply url-func url-func-args)
+            (error nil
+                   (apigee-management-api--refresh-access-token)
+                   (setq url-request-extra-headers `(("authorization" . ,(format "Bearer %s" (apigee-management-api--access-token)))
+                                                     ("content-type" . "application/json")))
+                   (apply url-func url-func-args)
+                   (url-retrieve-synchronously url)))
+        (when (eq url-func 'url-retrieve-synchronously)
+          (apply url-callback nil nil))))))
 
 
 
 ;; Environment API calls
 ;; https://apidocs.apigee.com/api/environments
 
-(defun apigee-management-api--get-environment-names ()
+(defun apigee-management-api-get-environment-names ()
   "Get environment names for `apigee-management-api-organisation'."
-  (apigee-management-api--request :endpoint "environments"))
+  (apigee-management-api--request "environments"))
 
-(defun apigee-management-api--get-environment-details (environment)
+(defun apigee-management-api-get-environment-details (environment)
   "Get ENVIRONMENT details for `apigee-management-api-organisation'."
-  (apigee-management-api--request :endpoint (format "environments/%s" environment)))
+  (apigee-management-api--request (format "environments/%s" environment)))
 
-(defun apigee-management-api--get-apis-deployed-to-environment (environment)
+(defun apigee-management-api-get-apis-deployed-to-environment (environment)
   "Get APIs deployed to ENVIRONMENT for `apigee-management-api-organisation'."
-  (apigee-management-api--request :endpoint (format "environments/%s/deployments" environment)))
+  (apigee-management-api--request (format "environments/%s/deployments" environment)))
 
 
 ;; APIs
-(cl-defun apigee-management-api--get-api (api)
+(cl-defun apigee-management-api-get-api (api)
   "Get API details for `apigee-management-api-organisation'."
-  (apigee-management-api--request :endpoint (format "apis/%s" api)))
+  (apigee-management-api--request (format "apis/%s" api)))
 
 
 
 ;; KVMs
-(cl-defun apigee-management-api--list-kvms (&key
-                                            api
-                                            environment
-                                            organization
-                                            &allow-other-keys)
+(cl-defun apigee-management-api-list-kvms (&key
+                                           api
+                                           environment
+                                           organization
+                                           &allow-other-keys)
   "Get all KeyValueMaps in specified scope.
 
 The scope is indicated by choice of key: API, ENVIRONMENT,
@@ -206,17 +210,16 @@ is used."
                         (environment
                          (format "environments/%s/keyvaluemaps" environment))
                         (organization "keyvaluemaps"))))
-    (apigee-management-api--request :endpoint endpoint))
-  )
+    (apigee-management-api--request endpoint)))
 
 
-(cl-defun apigee-management-api--get-kvm (kvm
-                                          &key
-                                          api
-                                          environment
-                                          organization
-                                          callback
-                                          &allow-other-keys)
+(cl-defun apigee-management-api-get-kvm (kvm
+                                         &key
+                                         api
+                                         environment
+                                         organization
+                                         callback
+                                         &allow-other-keys)
   "Get KeyValueMap KVM in specified scope.
 
 The scope is indicated by choice of key: API, ENVIRONMENT,
@@ -226,28 +229,23 @@ is used.
 CALLBACK is passed to `apigee-management-api--request'."
   (unless (or api environment organization)
     (user-error "Must specify one of API, ENVIRONMENT, ORGANIZATION"))
-  (let ((endpoint (cond (api
-                         (format "apis/%s/keyvaluemaps/%s" api kvm))
-                        (environment
-                         (format "environments/%s/keyvaluemaps/%s" environment kvm))
-                        (organization
-                         (format "keyvaluemaps/%s" kvm)))))
-    (apigee-management-api--request :endpoint endpoint
-                                    :callback callback)
-    )
-  )
+
+  (let ((endpoint (cond (api (format "apis/%s/keyvaluemaps/%s" api kvm))
+                        (environment (format "environments/%s/keyvaluemaps/%s" environment kvm))
+                        (organization (format "keyvaluemaps/%s" kvm)))))
+    (apigee-management-api--request endpoint :callback callback)))
 
 
 
-(cl-defun apigee-management-api--update-kvm-entry (&key
-                                                   kvm
-                                                   entry
-                                                   kvp
-                                                   api
-                                                   environment
-                                                   organization
-                                                   callback
-                                                   &allow-other-keys)
+(cl-defun apigee-management-api-update-kvm-entry (kvm
+                                                  entry
+                                                  kvp
+                                                  &key
+                                                  api
+                                                  environment
+                                                  organization
+                                                  callback
+                                                  &allow-other-keys)
   "Update KeyValueMap (KVM) entry (ENTRY) to a new key value pair (KVP).
 
 KVP should be a cons cell of the form (KEY . VALUE).  The scope
@@ -265,19 +263,15 @@ CALLBACK is passed to `apigee-management-api--request'."
                (stringp (cdr kvp)))
     (user-error "Both (KEY . VALUE) in KVP must be strings"))
 
-  (let ((request-body (json-encode `((name . ,(car kvp))
-                                     (value . ,(cdr kvp)))))
-        (endpoint (cond (api
-                         (format "apis/%s/keyvaluemaps/%s/entries/%s" api kvm entry))
-                        (environment
-                         (format "environments/%s/keyvaluemaps/%s/entries/%s" environment kvm entry))
-                        (organization
-                         (format "keyvaluemaps/%s/entries/%s" kvm entry)))))
-    (apigee-management-api--request :endpoint endpoint
+  (let ((formatted-kvp `((name . ,(car kvp))
+                         (value . ,(cdr kvp))))
+        (endpoint (cond (api (format "apis/%s/keyvaluemaps/%s/entries/%s" api kvm entry))
+                        (environment (format "environments/%s/keyvaluemaps/%s/entries/%s" environment kvm entry))
+                        (organization (format "keyvaluemaps/%s/entries/%s" kvm entry)))))
+    (apigee-management-api--request endpoint
                                     :method "POST"
+                                    :data formatted-kvp
                                     :callback callback)))
-
-
 
 (provide 'apigee-management-api)
 ;;; apigee-management-api.el ends here

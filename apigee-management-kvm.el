@@ -1,6 +1,10 @@
 ;;; -*- lexical-binding: t; -*-
 
+;;; Code:
 (require 'apigee-management-api)
+
+(defvar-local apigee-management-kvm--name nil
+  "Name of the KeyValueMap.")
 
 (defvar-local apigee-management-kvm--scope-type nil
   "Should be :api, :environment or :organisation.")
@@ -10,6 +14,8 @@
   in the case of organisation, following the conventions of
   `apigee-management-api'. ")
 
+
+
 (defun apigee-management-kvm--edit-key-value-pair-at-point ()
   "Edit the Key Value pair at point."
   (interactive)
@@ -18,8 +24,14 @@
          (current-val (aref row 1))
          (new-key (read-string "Key: " current-key 'minibuffer-history current-key))
          (new-val (read-string "Value: " current-val 'minibuffer-history current-val)))
-    (pp (cons new-key new-val))
-    ))
+
+    (apigee-management-api-update-kvm-entry
+     apigee-management-kvm--name
+     current-key
+     (cons new-key new-val)
+     apigee-management-kvm--scope-type ;; keyword -> :api, :environment, :organisation
+     apigee-management-kvm--scope ;; keyword-arg
+     )))
 
 
 (defvar apigee-management-kvm-mode-map
@@ -49,6 +61,7 @@ SCOPE-TYPE and SCOPE are forwarded to the appropriate
 
   (apigee-management-kvm-mode)
 
+  (setq apigee-management-kvm--name kvm-name)
   (setq apigee-management-kvm--scope-type scope-type)
   (setq apigee-management-kvm--scope scope)
 
@@ -64,3 +77,4 @@ SCOPE-TYPE and SCOPE are forwarded to the appropriate
 
 
 (provide 'apigee-management-kvm)
+;;; apigee-management-kvm.el ends here

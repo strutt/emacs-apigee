@@ -68,7 +68,7 @@
                    (list api-name (vector "Environment" env-name "" kvm-name "")))
                  env-kvms)
          (mapcar (lambda (kvm-name)
-                   (list api-name (vector "Organization" apigee-management-api "" kvm-name "")))
+                   (list api-name (vector "Organization" apigee-management-api-organization "" kvm-name "")))
                  org-kvms)))
   (tabulated-list-print t)
 
@@ -81,7 +81,7 @@
             (kvm-name (aref v 3))
             (key (apigee-management-kvms--scope-type-header-to-keyword-symbol scope-type))
             (buf-name (buffer-name)))
-       (apigee-management-api--get-kvm
+       (apigee-management-api-get-kvm
         kvm-name
         :callback (lambda (kvm)
                     (with-current-buffer buf-name

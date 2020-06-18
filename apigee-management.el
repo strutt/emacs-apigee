@@ -5,12 +5,12 @@
 
 (defun apigee-management--list-key-value-maps ()
   (interactive)
-    ;; aref indices must match `tabulated-list-format'
+  ;; aref indices must match `tabulated-list-format'
   (let* ((api-name (aref (tabulated-list-get-entry) 2))
-         (api-kvms (apigee-management-api--list-kvms :api api-name))
+         (api-kvms (apigee-management-api-list-kvms :api api-name))
          (environment (aref (tabulated-list-get-entry) 1))
-         (env-kvms (apigee-management-api--list-kvms :environment environment))
-         (org-kvms (apigee-management-api--list-kvms :organization nil)))
+         (env-kvms (apigee-management-api-list-kvms :environment environment))
+         (org-kvms (apigee-management-api-list-kvms :organization t)))
     (apigee-management-kvms api-kvms env-kvms org-kvms api-name environment)))
 
 (defun apigee-management--api-metadata-timestamp-to-string (timestamp)
@@ -24,7 +24,7 @@
          (api-names (mapcar (lambda (proxy)
                               (alist-get 'name proxy))
                             (alist-get 'aPIProxy env-apis)))
-         (apis (mapcar 'apigee-management-api--get-api api-names))
+         (apis (mapcar 'apigee-management-api-get-api api-names))
          (api-last-modified-ats (mapcar (lambda (api)
                                           (apigee-management--api-metadata-timestamp-to-string
                                            (alist-get 'lastModifiedAt (alist-get 'metaData api))))
@@ -48,9 +48,9 @@
 (defun apigee-management ()
   "Entrypoint apigee management."
   (interactive)
-  (let* ((environments (apigee-management-api--get-environment-names))
+  (let* ((environments (apigee-management-api-get-environment-names))
          (apis (mapcar
-                'apigee-management-api--get-apis-deployed-to-environment
+                'apigee-management-api-get-apis-deployed-to-environment
                 environments))
          (rows-list (mapcar
                      'apigee-management--api-to-table-row
