@@ -8,7 +8,7 @@
 
 (defvar apigee-management-kvms-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map [?k] 'apigee-management-kvms--expand)
+    (define-key map [?m] 'apigee-management-kvms--expand)
     map
     )
   )

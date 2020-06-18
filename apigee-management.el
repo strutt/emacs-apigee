@@ -67,7 +67,7 @@
 
 (defvar apigee-management-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map "k" 'apigee-management--list-key-value-maps)
+    (define-key map [?m] 'apigee-management--list-key-value-maps)
     map
     )
   )
