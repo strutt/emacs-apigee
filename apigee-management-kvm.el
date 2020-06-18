@@ -2,6 +2,31 @@
 
 (require 'apigee-management-api)
 
+(defvar-local apigee-management-kvm--scope-type nil
+  "Should be :api, :environment or :organisation.")
+
+(defvar-local apigee-management-kvm--scope nil
+  "Name of containing scope e.g. env-name, api-name. Can be nil
+  in the case of organisation, following the conventions of
+  `apigee-management-api'. ")
+
+(defun apigee-management-kvm--edit-key-value-pair-at-point ()
+  "Edit the Key Value pair at point."
+  (interactive)
+  (let* ((row (tabulated-list-get-entry))
+         (current-key (aref row 0))
+         (current-val (aref row 1))
+         (new-key (read-string "Key: " current-key 'minibuffer-history current-key))
+         (new-val (read-string "Value: " current-val 'minibuffer-history current-val)))
+    (pp (cons new-key new-val))
+    ))
+
+
+(defvar apigee-management-kvm-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [?e] 'apigee-management-kvm--edit-key-value-pair-at-point)
+    map ))
+
 (define-derived-mode
   apigee-management-kvm-mode
   tabulated-list-mode
@@ -15,11 +40,18 @@
   (setq tabulated-list-sort-key (cons "Key" nil))
   (tabulated-list-init-header))
 
+(defun apigee-management-kvm (kvm-name entry scope-type scope)
+  "Show entries in KeyValueMap KVM-NAME with entries given by ENTRY.
 
-(defun apigee-management-kvm (kvm-name entry)
-  "Show entries in KeyValueMap KVM-NAME with entries given by ENTRIES-JSON."
+SCOPE-TYPE and SCOPE are forwarded to the appropriate
+`apigee-management-api' functions."
   (pop-to-buffer (format "KeyValueMap: %s" kvm-name))
+
   (apigee-management-kvm-mode)
+
+  (setq apigee-management-kvm--scope-type scope-type)
+  (setq apigee-management-kvm--scope scope)
+
   (setq tabulated-list-entries
         (mapcar
          (lambda (kvp)
@@ -29,5 +61,6 @@
                         (alist-get 'value kvp)))))
          entry))
   (tabulated-list-print t))
+
 
 (provide 'apigee-management-kvm)

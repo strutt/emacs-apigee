@@ -8,19 +8,33 @@
 
 (defvar apigee-management-kvms-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map [?m] 'apigee-management-kvms--expand)
-    map
-    )
-  )
+    (define-key map [?m] 'apigee-management-kvms--map-at-point)
+    map))
 
-(defun apigee-management-kvms--expand ()
+(defun apigee-management-kvms--map-at-point ()
   "Show the KVM at point."
   (interactive)
   ;; aref indices must match `tabulated-list-format'
-  (let* ((entry (aref (tabulated-list-get-entry) 4))
-         (kvm-name (aref (tabulated-list-get-entry) 3)))
+  (let* ((row (tabulated-list-get-entry))
+         (entry (aref row 4))
+         (kvm-name (aref row 3))
+         (scope-type
+          (apigee-management-kvms--scope-type-header-to-keyword-symbol
+           (aref row 0)))
+         (scope (aref row 1)))
     
-    (apigee-management-kvm kvm-name (json-read-from-string entry))))
+    (apigee-management-kvm kvm-name
+                           (json-read-from-string entry)
+                           scope-type scope)))
+
+
+(defun apigee-management-kvms--scope-type-header-to-keyword-symbol (scope-type)
+  "Convert the header string SCOPE-TYPE from the to the corresponding keyword-symbol."
+  (cond ((string-equal scope-type "API") :api)
+        ((string-equal scope-type "Environment") :environment)
+        ((string-equal scope-type "Organization") :organization)
+        (t (error (format "Unknown scope-type: %s" scope-type)))))
+
 
 
 (define-derived-mode
@@ -65,21 +79,20 @@
             (scope-type (aref v 0))
             (scope-name (aref v 1))
             (kvm-name (aref v 3))
-            (key (cond ((string-equal scope-type "API") :api)
-                       ((string-equal scope-type "Environment") :environment)
-                       ((string-equal scope-type "Organization") :organization)))
+            (key (apigee-management-kvms--scope-type-header-to-keyword-symbol scope-type))
             (buf-name (buffer-name)))
-       (apigee-management-api--get-kvm kvm-name
-                                       (lambda (kvm)
-                                         (with-current-buffer buf-name
-                                           (aset v 2 (json-encode (alist-get 'encrypted kvm)))
-                                           (aset v 4 (json-encode (alist-get 'entry kvm)))
-                                           (tabulated-list-print t)))
-                                       key scope-name)))
+       (apigee-management-api--get-kvm
+        kvm-name
+        :callback (lambda (kvm)
+                    (with-current-buffer buf-name
+                      (aset v 2 (json-encode (alist-get 'encrypted kvm)))
+                      (aset v 4 (json-encode (alist-get 'entry kvm)))
+                      (tabulated-list-print t)))
+        key scope-name)))
    tabulated-list-entries)
 
-  
-  
+
+
   )
 
 (provide 'apigee-management-kvms)
