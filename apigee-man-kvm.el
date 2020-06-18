@@ -1,22 +1,22 @@
 ;;; -*- lexical-binding: t; -*-
 
 ;;; Code:
-(require 'apigee-management-api)
+(require 'apigee-man-api)
 
-(defvar-local apigee-management-kvm--name nil
+(defvar-local apigee-man-kvm--name nil
   "Name of the KeyValueMap.")
 
-(defvar-local apigee-management-kvm--scope-type nil
+(defvar-local apigee-man-kvm--scope-type nil
   "Should be :api, :environment or :organisation.")
 
-(defvar-local apigee-management-kvm--scope nil
+(defvar-local apigee-man-kvm--scope nil
   "Name of containing scope e.g. env-name, api-name. Can be nil
   in the case of organisation, following the conventions of
-  `apigee-management-api'. ")
+  `apigee-man-api'. ")
 
 
 
-(defun apigee-management-kvm--edit-key-value-pair-at-point ()
+(defun apigee-man-kvm--edit-key-value-pair-at-point ()
   "Edit the Key Value pair at point."
   (interactive)
   (let* ((row (tabulated-list-get-entry))
@@ -25,22 +25,22 @@
          (new-key (read-string "Key: " current-key 'minibuffer-history current-key))
          (new-val (read-string "Value: " current-val 'minibuffer-history current-val)))
 
-    (apigee-management-api-update-kvm-entry
-     apigee-management-kvm--name
+    (apigee-man-api-update-kvm-entry
+     apigee-man-kvm--name
      current-key
      (cons new-key new-val)
-     apigee-management-kvm--scope-type ;; keyword -> :api, :environment, :organisation
-     apigee-management-kvm--scope ;; keyword-arg
+     apigee-man-kvm--scope-type ;; keyword -> :api, :environment, :organisation
+     apigee-man-kvm--scope ;; keyword-arg
      )))
 
 
-(defvar apigee-management-kvm-mode-map
+(defvar apigee-man-kvm-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map [?e] 'apigee-management-kvm--edit-key-value-pair-at-point)
+    (define-key map [?e] 'apigee-man-kvm--edit-key-value-pair-at-point)
     map ))
 
 (define-derived-mode
-  apigee-management-kvm-mode
+  apigee-man-kvm-mode
   tabulated-list-mode
   "apigee kvm"
   "Manage a single Apigee KVM from the one true editor."
@@ -52,18 +52,18 @@
   (setq tabulated-list-sort-key (cons "Key" nil))
   (tabulated-list-init-header))
 
-(defun apigee-management-kvm (kvm-name entry scope-type scope)
+(defun apigee-man-kvm (kvm-name entry scope-type scope)
   "Show entries in KeyValueMap KVM-NAME with entries given by ENTRY.
 
 SCOPE-TYPE and SCOPE are forwarded to the appropriate
-`apigee-management-api' functions."
+`apigee-man-api' functions."
   (pop-to-buffer (format "KeyValueMap: %s" kvm-name))
 
-  (apigee-management-kvm-mode)
+  (apigee-man-kvm-mode)
 
-  (setq apigee-management-kvm--name kvm-name)
-  (setq apigee-management-kvm--scope-type scope-type)
-  (setq apigee-management-kvm--scope scope)
+  (setq apigee-man-kvm--name kvm-name)
+  (setq apigee-man-kvm--scope-type scope-type)
+  (setq apigee-man-kvm--scope scope)
 
   (setq tabulated-list-entries
         (mapcar
@@ -76,5 +76,5 @@ SCOPE-TYPE and SCOPE are forwarded to the appropriate
   (tabulated-list-print t))
 
 
-(provide 'apigee-management-kvm)
-;;; apigee-management-kvm.el ends here
+(provide 'apigee-man-kvm)
+;;; apigee-man-kvm.el ends here

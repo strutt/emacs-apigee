@@ -1,4 +1,4 @@
-;;; apigee-management-api.el --- Use the apigee admin API     -*- lexical-binding: t; -*-
+;;; apigee-man-api.el --- Use the apigee admin API     -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2020  Ben Strutt
 
@@ -30,19 +30,23 @@
 (require 'apigee-response)
 (require 'apigee-auth)
 
-(defcustom apigee-management-api-organization nil "Your organization, used in API calls.")
-(defcustom apigee-management-api-send-data-confirm t
+;; (defcustom apigee-man-api-organization nil "Your organization, used in API calls.")
+
+(defconst apigee-man-root-url "https://api.enterprise.apigee.com/v1"
+  "The Apigee management API URL.")
+
+(defcustom apigee-man-api-send-data-confirm t
   "Confirm before sending data.  Set to nil to disable.")
 
 
-(cl-defun apigee-management-api--request (endpoint
+(cl-defun apigee-man-api--request (endpoint
                                           &key
                                           callback
                                           data
                                           (method "GET"))
   "Make a request to ENDPOINT.
 
-The backbone of `apigee-management-api'.
+The backbone of `apigee-man-api'.
 
 METHOD should be a string representing an HTTP verb,
 e.g. \"GET\", \"POST\", \"PUT\".  Default is \"GET\".
@@ -52,17 +56,15 @@ DATA will be `json-encode'd and put in the request body for
 
 If CALLBACK is provided then endpoint is retrieved asynchronously
 calling CALLBACK with the emacs-lispified JSON data returned."
-  (unless apigee-management-api-organization
-    (user-error "Please set apigee-management-api-organization"))
+  (unless apigee-man-api-organization
+    (user-error "Please set apigee-man-api-organization"))
 
   (let* ((url-request-method method)
          (url-request-data (unless (string-equal method "GET")
                              (json-encode data)))
          (url-request-extra-headers `(,(apigee-auth-header)
                                       ("content-type" . "application/json")))
-         (url (format "https://api.enterprise.apigee.com/v1/organizations/%s/%s"
-                      apigee-management-api-organization
-                      endpoint))
+         (url (format "%s/%s" apigee-man-api-root-url endpoint))
          (url-func (if callback 'url-retrieve 'url-retrieve-synchronously))
          (url-callback (lambda (status &rest cbargs)
                          (let ((response-data (apigee-response)))
@@ -74,8 +76,8 @@ calling CALLBACK with the emacs-lispified JSON data returned."
          (url-func-args (if callback `(,url ,url-callback) `(,url))))
 
     (when (or (not url-request-data) ;; No need to confirm if there's no body
-              ;; only ask y-or-n-p if apigee-management-api-send-data-confirm is non-nil.
-              (not apigee-management-api-send-data-confirm)
+              ;; only ask y-or-n-p if apigee-man-api-send-data-confirm is non-nil.
+              (not apigee-man-api-send-data-confirm)
               (y-or-n-p (format "%s %s to %s? " method url-request-data url)))
       (with-current-buffer
           ;; Try to refresh token and try again if we have an error
@@ -97,28 +99,28 @@ calling CALLBACK with the emacs-lispified JSON data returned."
 ;; Environment API calls
 ;; https://apidocs.apigee.com/api/environments
 
-(defun apigee-management-api-get-environment-names ()
-  "Get environment names for `apigee-management-api-organisation'."
-  (apigee-management-api--request "environments"))
+(defun apigee-man-api-get-environment-names ()
+  "Get environment names for `apigee-man-api-organization'."
+  (apigee-man-api--request "environments"))
 
-(defun apigee-management-api-get-environment-details (environment)
-  "Get ENVIRONMENT details for `apigee-management-api-organisation'."
-  (apigee-management-api--request (format "environments/%s" environment)))
+(defun apigee-man-api-get-environment-details (environment)
+  "Get ENVIRONMENT details for `apigee-man-api-organization'."
+  (apigee-man-api--request (format "environments/%s" environment)))
 
-(defun apigee-management-api-get-apis-deployed-to-environment (environment)
-  "Get APIs deployed to ENVIRONMENT for `apigee-management-api-organisation'."
-  (apigee-management-api--request (format "environments/%s/deployments" environment)))
+(defun apigee-man-api-get-apis-deployed-to-environment (environment)
+  "Get APIs deployed to ENVIRONMENT for `apigee-man-api-organization'."
+  (apigee-man-api--request (format "environments/%s/deployments" environment)))
 
 
 ;; APIs
-(cl-defun apigee-management-api-get-api (api)
-  "Get API details for `apigee-management-api-organisation'."
-  (apigee-management-api--request (format "apis/%s" api)))
+(cl-defun apigee-man-api-get-api (api)
+  "Get API details for `apigee-man-api-organization'."
+  (apigee-man-api--request (format "apis/%s" api)))
 
 
 
 ;; KVMs
-(cl-defun apigee-management-api-list-kvms (&key
+(cl-defun apigee-man-api-list-kvms (&key
                                            api
                                            environment
                                            organization
@@ -127,9 +129,7 @@ calling CALLBACK with the emacs-lispified JSON data returned."
 
 The scope is indicated by choice of key: API, ENVIRONMENT,
 ORGANIZATION.  If passed multiple keys we prefer the lowest
-scope: API, then ENVIRONMENT, then ORGANIZATION.  The
-organization value is ignored as `apigee-management-api-organization'
-is used."
+scope: API, then ENVIRONMENT, then ORGANIZATION."
   (unless (or api environment organization)
     (user-error "Must specify one of API, ENVIRONMENT, ORGANIZATION"))
   (let ((endpoint (cond (api
@@ -137,10 +137,10 @@ is used."
                         (environment
                          (format "environments/%s/keyvaluemaps" environment))
                         (organization "keyvaluemaps"))))
-    (apigee-management-api--request endpoint)))
+    (apigee-man-api--request endpoint)))
 
 
-(cl-defun apigee-management-api-get-kvm (kvm
+(cl-defun apigee-man-api-get-kvm (kvm
                                          &key
                                          api
                                          environment
@@ -151,20 +151,20 @@ is used."
 
 The scope is indicated by choice of key: API, ENVIRONMENT,
 ORGANIZATION.  If passed multiple keys we prefer the lowest
-scope: API, then ENVIRONMENT, then ORGANIZATION. organization value is ignored as `apigee-management-api-organization'
-is used.
-CALLBACK is passed to `apigee-management-api--request'."
+scope: API, then ENVIRONMENT, then ORGANIZATION.
+
+CALLBACK is passed to `apigee-man-api--request'."
   (unless (or api environment organization)
     (user-error "Must specify one of API, ENVIRONMENT, ORGANIZATION"))
 
   (let ((endpoint (cond (api (format "apis/%s/keyvaluemaps/%s" api kvm))
                         (environment (format "environments/%s/keyvaluemaps/%s" environment kvm))
                         (organization (format "keyvaluemaps/%s" kvm)))))
-    (apigee-management-api--request endpoint :callback callback)))
+    (apigee-man-api--request endpoint :callback callback)))
 
 
 
-(cl-defun apigee-management-api-update-kvm-entry (kvm
+(cl-defun apigee-man-api-update-kvm-entry (kvm
                                                   entry
                                                   kvp
                                                   &key
@@ -178,10 +178,9 @@ CALLBACK is passed to `apigee-management-api--request'."
 KVP should be a cons cell of the form (KEY . VALUE).  The scope
 is indicated by choice of key: API, ENVIRONMENT, ORGANIZATION.
 If passed multiple keys we prefer the lowest scope: API, then
-ENVIRONMENT, then ORGANIZATION.  Note: the ORGANISATION value is
-ignored as `apigee-management-api-organization' is used.
+ENVIRONMENT, then ORGANIZATION.
 
-CALLBACK is passed to `apigee-management-api--request'."
+CALLBACK is passed to `apigee-man-api--request'."
 
   (unless (or api environment organization)
     (user-error "Must specify one of API, ENVIRONMENT, ORGANIZATION"))
@@ -195,10 +194,10 @@ CALLBACK is passed to `apigee-management-api--request'."
         (endpoint (cond (api (format "apis/%s/keyvaluemaps/%s/entries/%s" api kvm entry))
                         (environment (format "environments/%s/keyvaluemaps/%s/entries/%s" environment kvm entry))
                         (organization (format "keyvaluemaps/%s/entries/%s" kvm entry)))))
-    (apigee-management-api--request endpoint
+    (apigee-man-api--request endpoint
                                     :method "POST"
                                     :data formatted-kvp
                                     :callback callback)))
 
-(provide 'apigee-management-api)
-;;; apigee-management-api.el ends here
+(provide 'apigee-man-api)
+;;; apigee-man-api.el ends here

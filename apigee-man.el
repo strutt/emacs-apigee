@@ -1,32 +1,36 @@
 ;;; -*- lexical-binding: t; -*-
 
-(require 'apigee-management-api)
-(require 'apigee-management-kvms)
+(require 'apigee-man-api)
+(require 'apigee-man-kvms)
 
-(defun apigee-management--list-key-value-maps ()
+(defcustom apigee-man-organizations nil
+  "List of organizations you with to interact with.")
+
+
+(defun apigee-man--list-key-value-maps ()
   (interactive)
   ;; aref indices must match `tabulated-list-format'
   (let* ((api-name (aref (tabulated-list-get-entry) 2))
-         (api-kvms (apigee-management-api-list-kvms :api api-name))
+         (api-kvms (apigee-man-api-list-kvms :api api-name))
          (environment (aref (tabulated-list-get-entry) 1))
-         (env-kvms (apigee-management-api-list-kvms :environment environment))
-         (org-kvms (apigee-management-api-list-kvms :organization t)))
-    (apigee-management-kvms api-kvms env-kvms org-kvms api-name environment)))
+         (env-kvms (apigee-man-api-list-kvms :environment environment))
+         (org-kvms (apigee-man-api-list-kvms :organization t)))
+    (apigee-man-kvms api-kvms env-kvms org-kvms api-name environment)))
 
-(defun apigee-management--api-metadata-timestamp-to-string (timestamp)
+(defun apigee-man--api-metadata-timestamp-to-string (timestamp)
   "Remove the random factor of 1000 from TIMESTAMP and format nicely for GMT string."
   (format-time-string "%Y-%m-%dT%H:%M:%S" (seconds-to-time (/ timestamp 1000)) t))
 
 
-(defun apigee-management--api-to-table-row (env-apis)
+(defun apigee-man--api-to-table-row (env-apis)
   "Convert ENV-APIS to tabulated list rows."
   (let* ((environment (alist-get 'name env-apis))
          (api-names (mapcar (lambda (proxy)
                               (alist-get 'name proxy))
                             (alist-get 'aPIProxy env-apis)))
-         (apis (mapcar 'apigee-management-api-get-api api-names))
+         (apis (mapcar 'apigee-man-api-get-api api-names))
          (api-last-modified-ats (mapcar (lambda (api)
-                                          (apigee-management--api-metadata-timestamp-to-string
+                                          (apigee-man--api-metadata-timestamp-to-string
                                            (alist-get 'lastModifiedAt (alist-get 'metaData api))))
                                         apis))
          
@@ -45,39 +49,36 @@
              )))
 
 
-(defun apigee-management ()
+(defun apigee-man ()
   "Entrypoint apigee management."
   (interactive)
-  (let* ((environments (apigee-management-api-get-environment-names))
+  (let* ((environments (apigee-man-api-get-environment-names))
          (apis (mapcar
-                'apigee-management-api-get-apis-deployed-to-environment
+                'apigee-man-api-get-apis-deployed-to-environment
                 environments))
          (rows-list (mapcar
-                     'apigee-management--api-to-table-row
+                     'apigee-man--api-to-table-row
                      apis))
          (rows (apply 'append rows-list))
          )
-    (pop-to-buffer (format "*apigee management: %s*" apigee-management-api-organization))
-    (apigee-management-mode)
+    (pop-to-buffer (format "*apigee management*"))
+    (apigee-man-mode)
     (setq tabulated-list-entries rows)
     (tabulated-list-print t))
   (goto-char (point-min))
   )
 
 
-(defvar apigee-management-mode-map
+(defvar apigee-man-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map [?m] 'apigee-management--list-key-value-maps)
+    (define-key map [?m] 'apigee-man--list-key-value-maps)
     map
     )
   )
 
 
-
-
-
 (define-derived-mode
-  apigee-management-mode
+  apigee-man-mode
   tabulated-list-mode
   "apigee"
   "Manage Apigee from the one true editor."
