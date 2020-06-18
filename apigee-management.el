@@ -1,4 +1,4 @@
-;; TODO
+;;; -*- lexical-binding: t; -*-
 
 (require 'apigee-management-api)
 (require 'apigee-management-kvms)
@@ -7,17 +7,10 @@
   (interactive)
     ;; aref indices must match `tabulated-list-format'
   (let* ((api-name (aref (tabulated-list-get-entry) 2))
-         (api-kvms (mapcar (lambda (kvm-name)
-                             (apigee-management-api--get-kvm kvm-name :api api-name))
-                           (apigee-management-api--list-kvms :api api-name)))
+         (api-kvms (apigee-management-api--list-kvms :api api-name))
          (environment (aref (tabulated-list-get-entry) 1))
-         (env-kvms (mapcar (lambda (kvm-name)
-                             (apigee-management-api--get-kvm kvm-name :environment environment))
-                           (apigee-management-api--list-kvms :environment environment)))
-         (org-kvms (mapcar (lambda (kvm-name)
-                             (apigee-management-api--get-kvm kvm-name :organization nil))
-                           (apigee-management-api--list-kvms :organization nil))))
-
+         (env-kvms (apigee-management-api--list-kvms :environment environment))
+         (org-kvms (apigee-management-api--list-kvms :organization nil)))
     (apigee-management-kvms api-kvms env-kvms org-kvms api-name environment)))
 
 (defun apigee-management--api-metadata-timestamp-to-string (timestamp)

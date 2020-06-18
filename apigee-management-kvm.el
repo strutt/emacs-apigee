@@ -1,3 +1,5 @@
+;;; -*- lexical-binding: t; -*-
+
 (require 'apigee-management-api)
 
 (define-derived-mode

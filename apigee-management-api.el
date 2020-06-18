@@ -50,7 +50,7 @@
     (setq apigee-management-api--refresh-token (alist-get 'refresh_token data))))
 
 (defun apigee-management-api--refresh-access-token ()
-  "Get."
+  "Refresh your access token."
 
   (unless apigee-management-api--refresh-token
     (user-error "Cannot refresh access token without refresh token")
@@ -61,12 +61,15 @@
                                   apigee-management-api--refresh-token))
         (url-request-method "POST")
         (url-request-extra-headers apigee-management-api--request-extra-headers))
-      (with-current-buffer
-          (url-retrieve-synchronously url)
-        (apigee-management-api--set-tokens))))
+    (with-current-buffer
+        (url-retrieve-synchronously url)
+      (apigee-management-api--set-tokens))))
 
 (defun apigee-management-api--get-new-access-token ()
-  "Get and set `apigee-management-api--access-token' and `apigee-amin--refresh-token'.
+  "Send your username and password to get tokens.
+
+This functions sets `apigee-management-api--access-token' and
+`apigee-amin--refresh-token'.
 
 Searches your auth-sources for username/password for
 login.apigee.com, prompts for them if that search fails.  Prompts
@@ -100,33 +103,46 @@ https://docs.apigee.com/api-platform/system-administration/management-api-tokens
     (apigee-management-api--get-new-access-token))
   apigee-management-api--access-token)
 
-(defun apigee-management-api--get (endpoint)
-  "Read the data from ENDPOINT."
+(defun apigee-management-api--get (endpoint &optional callback)
+  "Read the data from ENDPOINT.
+
+If CALLBACK is provided then endpoint is retrieved asynchronously
+calling CALLBACK with the emacs-lispified JSON data returned."
   (unless apigee-management-api-organization
     (user-error "Please set apigee-management-api-organization"))
-  
-  (let ((url-request-extra-headers `(("authorization" . ,(format "Bearer %s" (apigee-management-api--access-token)))))
-        (url (format "https://api.enterprise.apigee.com/v1/organizations/%s/%s"
-                     apigee-management-api-organization
-                     endpoint)))
-    (message url)
+
+  (let* ((url-request-extra-headers `(("authorization" . ,(format "Bearer %s" (apigee-management-api--access-token)))))
+         (url (format "https://api.enterprise.apigee.com/v1/organizations/%s/%s"
+                      apigee-management-api-organization
+                      endpoint))
+         (url-func (if callback 'url-retrieve 'url-retrieve-synchronously))
+         (url-callback (lambda (status &rest cbargs)
+                         (let ((response-data (apigee-management-api--response-data)))
+                           (when (string-match-p "*http" (buffer-name))
+                             (kill-buffer (current-buffer)))
+                           (when callback
+                             (apply callback (list response-data)))
+                           response-data)))
+         (url-func-args (if callback `(,url ,url-callback) `(,url))))
+    
     (with-current-buffer
         ;; Try to refresh token and try again if we have an error
         ;; thrown, this could be improved.
+        ;; TODO make this work in both sync + async cases!
         (condition-case nil
-            (url-retrieve-synchronously url)
+            (apply url-func url-func-args)
           (error nil
                  (apigee-management-api--refresh-access-token)
                  (setq url-request-extra-headers `(("authorization" . ,(format "Bearer %s" (apigee-management-api--access-token)))))
+                 (apply url-func url-func-args)
                  (url-retrieve-synchronously url)))
-      (let ((response-data (apigee-management-api--response-data)))
-        (when (string-match-p "*http" (buffer-name))
-          (kill-buffer (current-buffer)))
-        response-data))))
+      (when (eq url-func 'url-retrieve-synchronously)
+        (apply url-callback nil nil)))))
 
 ;; (defun apigee-management-api--apiproducts ()
 ;;   "List API products."
 ;;   (apigee-management-api--get "apiproducts"))
+
 
 
 
@@ -147,19 +163,19 @@ https://docs.apigee.com/api-platform/system-administration/management-api-tokens
 
 
 ;; APIs
-(defun apigee-management-api--get-api (api)
-  "Get environment names for `apigee-management-api-organisation'."
+(cl-defun apigee-management-api--get-api (api)
+  "Get API details for `apigee-management-api-organisation'."
   (apigee-management-api--get (format "apis/%s" api)))
 
 
 
 ;; KVMs
 (cl-defun apigee-management-api--list-kvms (&optional
-                                       &key
-                                       api
-                                       environment
-                                       organization
-                                       &allow_other_keys)
+                                            &key
+                                            api
+                                            environment
+                                            organization
+                                            &allow_other_keys)
   "Get KeyValueMap for scope.
 
 The scope is indicated by choice of key: API, ENVIRONMENT,
@@ -175,12 +191,13 @@ is used."
          (apigee-management-api--get (format "keyvaluemaps" apigee-management-api-organization)))))
 
 (cl-defun apigee-management-api--get-kvm (kvm
-                                     &optional
-                                     &key
-                                     api
-                                     environment
-                                     organization
-                                     &allow_other_keys)
+                                          &optional
+                                          callback
+                                          &key
+                                          api
+                                          environment
+                                          organization
+                                          &allow_other_keys)
   "Get KeyValueMap KVM.
 
 The scope is indicated by choice of key: API, ENVIRONMENT,
@@ -188,11 +205,11 @@ ORGANIZATION.  If passed multiple keys we prefer the lowest
 scope: API, then ENVIRONMENT, then ORGANIZATION. organization value is ignored as `apigee-management-api-organization'
 is used."
   (cond (api
-         (apigee-management-api--get (format "apis/%s/keyvaluemaps/%s" api kvm)))
+         (apigee-management-api--get (format "apis/%s/keyvaluemaps/%s" api kvm) callback))
         (environment
-         (apigee-management-api--get (format "environments/%s/keyvaluemaps/%s" environment kvm)))
+         (apigee-management-api--get (format "environments/%s/keyvaluemaps/%s" environment kvm) callback))
         (organization
-         (apigee-management-api--get (format "keyvaluemaps/%s" kvm)))))
+         (apigee-management-api--get (format "keyvaluemaps/%s" kvm) callback))))
 
 
 ;; Keystores/truststores

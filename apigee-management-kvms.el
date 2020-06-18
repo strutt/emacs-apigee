@@ -1,3 +1,5 @@
+;;; -*- lexical-binding: t; -*-
+
 (require 'apigee-management-api)
 (require 'apigee-management-kvm)
 
@@ -15,8 +17,8 @@
   "Show the KVM at point."
   (interactive)
   ;; aref indices must match `tabulated-list-format'
-  (let* ((entry (aref (tabulated-list-get-entry) 3))
-         (kvm-name (aref (tabulated-list-get-entry) 2)))
+  (let* ((entry (aref (tabulated-list-get-entry) 4))
+         (kvm-name (aref (tabulated-list-get-entry) 3)))
     
     (apigee-management-kvm kvm-name (json-read-from-string entry))))
 
@@ -27,7 +29,8 @@
   "apigee kvms"
   "Manage Apigee KVMs from the one true editor."
 
-  (setq tabulated-list-format [("Scope" 20 t)
+  (setq tabulated-list-format [("Scope Type" 11 t)
+                               ("Scope Name" 20 t)
                                ("Encrypted" 9 t)
                                ("Name" 30 t)
                                ("Entries" 100 t)
@@ -44,34 +47,39 @@
   (setq apigee-management-kvms--environment env-name)
   (setq tabulated-list-entries
         (append
-         (mapcar (lambda (kvm)
-                   (let ((kvm-name (alist-get 'name kvm)))
-                     (list kvm-name
-                           (vector api-name
-                                   (json-encode (alist-get 'encrypted kvm))
-                                   kvm-name
-                                   (json-encode (alist-get 'entry kvm))))))
+         (mapcar (lambda (kvm-name)
+                   (list api-name (vector "API" api-name "" kvm-name "")))
                  api-kvms)
-
-         (mapcar (lambda (kvm)
-                   (let ((kvm-name (alist-get 'name kvm)))
-                     (list kvm-name
-                           (vector env-name
-                                   (json-encode (alist-get 'encrypted kvm))
-                                   kvm-name
-                                   (json-encode (alist-get 'entry kvm))))))
+         (mapcar (lambda (kvm-name)
+                   (list api-name (vector "Environment" env-name "" kvm-name "")))
                  env-kvms)
+         (mapcar (lambda (kvm-name)
+                   (list api-name (vector "Organization" apigee-management-api "" kvm-name "")))
+                 org-kvms)))
+  (tabulated-list-print t)
 
-         (mapcar (lambda (kvm)
-                   (let ((kvm-name (alist-get 'name kvm)))
-                     (list kvm-name
-                           (vector apigee-management-api-organization
-                                   (json-encode (alist-get 'encrypted kvm))
-                                   kvm-name
-                                   (json-encode (alist-get 'entry kvm))))))
-                 org-kvms)
-         
-         ))
-  (tabulated-list-print t))
+  ;; Dispatch async requests to get KVM details.
+  (mapc
+   (lambda (tabulated-list-entry)
+     (let* ((v (nth 1 tabulated-list-entry))
+            (scope-type (aref v 0))
+            (scope-name (aref v 1))
+            (kvm-name (aref v 3))
+            (key (cond ((string-equal scope-type "API") :api)
+                       ((string-equal scope-type "Environment") :environment)
+                       ((string-equal scope-type "Organization") :organization)))
+            (buf-name (buffer-name)))
+       (apigee-management-api--get-kvm kvm-name
+                                       (lambda (kvm)
+                                         (with-current-buffer buf-name
+                                           (aset v 2 (json-encode (alist-get 'encrypted kvm)))
+                                           (aset v 4 (json-encode (alist-get 'entry kvm)))
+                                           (tabulated-list-print t)))
+                                       key scope-name)))
+   tabulated-list-entries)
+
+  
+  
+  )
 
 (provide 'apigee-management-kvms)
