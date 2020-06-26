@@ -52,9 +52,12 @@
 (defun apigee-man ()
   "Entrypoint apigee management."
   (interactive)
-  (let* ((environments (apigee-man-api-get-environment-names))
+  (let* ((org (car apigee-man-organizations))
+         (environments (apigee-man-api-list-environment-names org))
          (apis (mapcar
-                'apigee-man-api-get-apis-deployed-to-environment
+                (lambda (env)
+                  apigee-man-api-get-apis-deployed-to-environment org env)
+                org
                 environments))
          (rows-list (mapcar
                      'apigee-man--api-to-table-row
