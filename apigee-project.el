@@ -1,27 +1,50 @@
 (require 'apigee-man-api)
 
-
-
-
-(defun apigee-project-zip-api-proxy ()
-  (let ((zip-dir (locate-dominating-file
+(defun apigee-project--build ()
+  "Assemble the zipped apiproxy ready for upload."
+  (let ((src-dir (locate-dominating-file
                   default-directory
                   "apiproxy"))
-        ;; TODO uniqify zip-file-name?
+        (dest-dir (concat (temporary-file-directory) "apiproxy"))
+        (templates apigee-project-template-values)
         (zip-file-name (format "%sapiproxy.zip"
                                (temporary-file-directory))))
 
-    (unless zip-dir
+    (unless src-dir
       (user-error "Not inside an apiproxy directory"))
 
     (when (file-exists-p zip-file-name)
       (delete-file zip-file-name)
       (message "Deleting %s" zip-file-name))
 
+    (when (file-exists-p dest-dir)
+      (delete-directory dest-dir t)
+      (message "Deleting %s" dest-dir))
+
+    (dired-copy-file-recursive (concat src-dir "apiproxy")
+                               dest-dir
+                               nil nil nil 'always)
+
+    (let* ((file-names (directory-files-recursively dest-dir ".+" ))
+           (recentf-exclude file-names) ;; Prevent flooding!
+           )
+      (save-excursion
+        (mapc (lambda (file-name)
+                (with-temp-buffer
+                  (insert-file-contents file-name)
+                  (mapc (lambda (template)
+                          (goto-char (point-min))
+                          (replace-string (car template) (cdr template)))
+                        templates)
+                  (write-file file-name)))
+              file-names)))
+
+
     ;; Zip directory contents.
-    (let ((default-directory zip-dir))
-      (call-process "zip" nil nil nil "-r" zip-file-name "apiproxy")
-      (message default-directory))
+    (let ((default-directory (temporary-file-directory)))
+      (call-process "zip" nil nil nil "-r" zip-file-name "apiproxy"))
+
+    ;; Return zip file name
     zip-file-name))
 
 
@@ -31,10 +54,10 @@
 (defun apigee-project-import-api-proxy (arg)
   "Validate the API proxy.
 
-If called with prefix ARG. then actually import it."
+yIf called with prefix ARG. then actually import it."
   (interactive "P")
 
-  (let* ((zip-file-name (apigee-project-zip-api-proxy))
+  (let* ((zip-file-name (apigee-project--build))
          (action (if arg "import" "validate"))
          (response-data (apigee-man-api-import-api
                          apigee-project-organization
@@ -48,6 +71,12 @@ If called with prefix ARG. then actually import it."
   "The organization associated with this project."
   :group 'apigee
   :type 'string)
+
+(defcustom apigee-project-template-values nil
+  "List of template values used to build the project."
+  :group 'apigee
+  :type 'alist
+  )
 
 (define-minor-mode apigee-project-mode
   "Toggle Apigee Project mode."
