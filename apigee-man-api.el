@@ -73,7 +73,8 @@ calling CALLBACK with the `json-read' data returned."
     (when (or (not confirm)
               ;; only ask y-or-n-p if apigee-man-api-send-data-confirm is non-nil.
               (not apigee-man-api-send-data-confirm)
-              (y-or-n-p (format "%s %s to %s? " method url-request-data url)))
+              (y-or-n-p (if (string-p confirm) confirm
+                          (format "%s %s to %s? " method url-request-data url))))
       (with-current-buffer
           ;; Try to refresh token and try again if we have an error
           ;; thrown, this could be improved.
@@ -96,7 +97,7 @@ calling CALLBACK with the `json-read' data returned."
 
 (defun apigee-man-api-list-environment-names (organization)
   "Get environment names in ORGANIZATION."
-  (apigee-man-api--request (format "organizations/%s/environments")))
+  (apigee-man-api--request (format "organizations/%s/environments" organization)))
 
 (defun apigee-man-api-get-environment-details (organization environment)
   "Get ENVIRONMENT details for ORGANIZATION."
@@ -104,13 +105,41 @@ calling CALLBACK with the `json-read' data returned."
 
 (defun apigee-man-api-get-apis-deployed-to-environment (organization environment)
   "Get APIs deployed to ENVIRONMENT for ORGANIZATION."
-  (apigee-man-api--request (format "organizations/%s/environments/%s/deployments" environment)))
-
+  (apigee-man-api--request (format "organizations/%s/environments/%s/deployments" organization environment)))
 
 ;; APIs
 (cl-defun apigee-man-api-get-api (organization api)
   "Get details of API from ORGANIZATION."
   (apigee-man-api--request (format "organizations/%s/apis/%s" organization api)))
+
+(cl-defun apigee-man-api-get-api-revisions (organization api)
+  "Get details of API REVSION from ORGANIZATION."
+  (apigee-man-api--request (format "organizations/%s/apis/%s/revisions"
+                                   organization api)))
+
+(cl-defun apigee-man-api-get-api-revision (organization api revision)
+  "Get details of API REVSION from ORGANIZATION."
+  (apigee-man-api--request (format "organizations/%s/apis/%s/revisions/%d"
+                                   organization api revision)))
+
+
+
+(defun apigee-man-api-deploy-api-revision (organization
+                                           environment
+                                           api
+                                           revision)
+  "Deploy API at REVISION to ORGANIZATION in ENVIRONMENT."
+  (apigee-man-api--request (format "organizations/%s/environments/%s/apis/%s/revision/%d"
+                                   organization
+                                   environment
+                                   api
+                                   revision)
+                           :method "POST"
+                           :confirm (format "Deploy %s rev %d to %s?" api revision environment)
+                           )
+  )
+
+
 
 (cl-defun apigee-man-api-import-api (organization api zip-file-name
                                                   &key (action "validate"))
