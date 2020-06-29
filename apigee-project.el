@@ -117,10 +117,23 @@ that. Otherwise prompt user to choose from environments in
   :init-value nil
   :lighter " Apigee"
   :keymap  (let ((map (make-sparse-keymap)))
-             (define-key map (kbd "\C-x \C-a i") 'apigee-project-import-api-proxy)
-             (define-key map (kbd "\C-x \C-a d") 'apigee-project-deployment)
+             (define-key map (kbd "\C-x \C-a \C-u") 'apigee-project-import-api-proxy)
+             (define-key map (kbd "\C-x \C-a \C-d") 'apigee-project-deployment)
              map)
   :group 'apigee)
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -130,8 +143,7 @@ that. Otherwise prompt user to choose from environments in
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "a") 'apigee-project-deployment-deploy-marked)
     (define-key map (kbd "r") 'apigee-project-deployment-undeploy-marked)
-    map)
-  )
+    map))
 
 (define-derived-mode apigee-project-deployment-mode
   tablist-mode
@@ -159,10 +171,10 @@ that. Otherwise prompt user to choose from environments in
     (apigee-project-deployment-mode)
     (setq-local apigee-project-organization org)
     (setq-local apigee-project-api api)
-    (setq-local apigee-project--environments envs)
+    (setq-local apigee-project--environments (seq-map 'identity envs))
     
     (setq tabulated-list-format
-          (let ((tlf '(("Rev" 3 t))))
+          (let ((tlf '(("Rev" 3 (lambda (a b) (< (car a) (car b)))))))
             (apply 'vector
                    (append
                     tlf
@@ -218,8 +230,7 @@ that. Otherwise prompt user to choose from environments in
   "Refresh if required."
   (when apigee-project-deployment--refresh
     (apigee-project-deployment)
-    (setq apigee-project-deployment--refresh nil))
-  )
+    (setq apigee-project-deployment--refresh nil)))
 
 (defun apigee-project-deployment-undeploy-marked ()
   "Undeploy all marked revisions, ARG."
@@ -230,13 +241,12 @@ that. Otherwise prompt user to choose from environments in
                         nil t))
 
 (defun apigee-project-deployment-deploy-marked ()
-  "Undeploy all marked revisions, ARG."
+  "Deploy all marked revisions, ARG."
   (interactive)
   (tablist-do-operation current-prefix-arg
                         'apigee-project-deployment--deploy-marked
                         "Deploy revision"
                         nil t))
-
 
 (defun apigee-project-deployment--get-entry-by-id (id)
   "Get entry in `tabulated-list-entries' by ID."
@@ -252,8 +262,6 @@ that. Otherwise prompt user to choose from environments in
   (interactive)
   (unless entry
     (setq entry (apigee-project-deployment--get-entry-by-id id)))
-  
-
   (mapc (lambda (env)
           (let ((state (aref (nth 1 entry)
                              (tabulated-list--column-number env))))
@@ -265,33 +273,37 @@ that. Otherwise prompt user to choose from environments in
               (setq apigee-project-deployment--refresh t))))
         apigee-project--environments))
 
-
 (defun apigee-project-deployment--deploy-marked (id &optional entry)
   "Deploy ENTRY marked by ID."
   (interactive)
   (unless entry
     (setq entry (apigee-project-deployment--get-entry-by-id id)))
-  
-  (mapc (lambda (env)
-          (let ((state (aref (nth 1 entry)
-                             (tabulated-list--column-number env))))
-            (when (not (string-equal "Deployed" state))
-              (apigee-man-api-deploy-api-revision apigee-project-organization
-                                                  env
-                                                  apigee-project-api
-                                                  id)
-              (setq apigee-project-deployment--refresh t))))
-        apigee-project--environments))
-
+  (let ((envs (completing-read-multiple "Select environments: "
+                                        apigee-project--environments
+                                        (lambda (env)
+                                          (not (string-equal
+                                                "Deployed"
+                                                (aref (nth 1 entry)
+                                                      (tabulated-list--column-number env)))))
+                                        ;; nil
+                                        t
+                                        nil
+                                        t
+                                        )))
+    (mapc (lambda (env)
+            (apigee-man-api-deploy-api-revision apigee-project-organization
+                                                env
+                                                apigee-project-api
+                                                id)
+            (setq apigee-project-deployment--refresh t))
+          envs)))
 
 (defun apigee-project-deployment--operate (operation &rest args)
-  "Do OPERATION on selected entries."
+  "Do OPERATION on selected entries encoded in ARGS."
   (cond ((eq operation 'supported-operations)
          '(delete) )
-
         ((eq operation 'delete)
-         (apigee-project-deployment--delete-marked (car args)))
-        ))
+         (apigee-project-deployment--delete-marked (car args)))))
 
 (defun apigee-project-deployment--delete-marked (ids)
   "Delete entries with IDS."
@@ -301,8 +313,6 @@ that. Otherwise prompt user to choose from environments in
                                               revision)
           (setq-local apigee-project-deployment--refresh t))
         ids))
-
-
 
 (provide 'apigee-project)
 ;;; apigee-project.el ends here
