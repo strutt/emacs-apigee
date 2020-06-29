@@ -73,7 +73,7 @@ calling CALLBACK with the `json-read' data returned."
     (when (or (not confirm)
               ;; only ask y-or-n-p if apigee-man-api-send-data-confirm is non-nil.
               (not apigee-man-api-send-data-confirm)
-              (y-or-n-p (if (string-p confirm) confirm
+              (y-or-n-p (if (stringp confirm) confirm
                           (format "%s %s to %s? " method url-request-data url))))
       (with-current-buffer
           ;; Try to refresh token and try again if we have an error
@@ -103,9 +103,10 @@ calling CALLBACK with the `json-read' data returned."
   "Get ENVIRONMENT details for ORGANIZATION."
   (apigee-man-api--request (format "organizations/%s/environments/%s" environment)))
 
-(defun apigee-man-api-get-apis-deployed-to-environment (organization environment)
+(cl-defun apigee-man-api-get-apis-deployed-to-environment (organization environment &key callback)
   "Get APIs deployed to ENVIRONMENT for ORGANIZATION."
-  (apigee-man-api--request (format "organizations/%s/environments/%s/deployments" organization environment)))
+  (apigee-man-api--request (format "organizations/%s/environments/%s/deployments" organization environment
+                                   :callback callback)))
 
 ;; APIs
 (cl-defun apigee-man-api-get-api (organization api)
@@ -129,15 +130,31 @@ calling CALLBACK with the `json-read' data returned."
                                            api
                                            revision)
   "Deploy API at REVISION to ORGANIZATION in ENVIRONMENT."
-  (apigee-man-api--request (format "organizations/%s/environments/%s/apis/%s/revision/%d"
+  (apigee-man-api--request (format "organizations/%s/environments/%s/apis/%s/revisions/%d/deployments"
                                    organization
                                    environment
                                    api
                                    revision)
+                           :content-type "application/x-www-form-urlencoded"
                            :method "POST"
-                           :confirm (format "Deploy %s rev %d to %s?" api revision environment)
-                           )
-  )
+                           :data "override=false"
+                           :confirm (format "Deploy %s rev %d to %s?" api revision environment)))
+
+
+(defun apigee-man-api-undeploy-api-revision (organization
+                                             environment
+                                             api
+                                             revision)
+  "Undeploy API at REVISION to ORGANIZATION in ENVIRONMENT."
+  (apigee-man-api--request (format "organizations/%s/environments/%s/apis/%s/revisions/%d/deployments"
+                                   organization
+                                   environment
+                                   api
+                                   revision)
+                           :method "DELETE"
+                           :confirm (format "Undeploy %s rev %d from %s?" api revision environment)))
+
+
 
 
 
@@ -158,7 +175,7 @@ ACTION should be either \"import\" or \"validate\", defaults to \"validate\"."
     (let* ((multi-part-boundary ;; Random string
             (let ((s "abcdefghijkl"))
               (dotimes (i (length s))
-                (aset s i (aref "abcdefghijklmnopqrstuvwxyz012345789" (random 36))))
+                (aset s i (aref "abcdefghijklmnopqrstuvwxyz0123456789" (random 36))))
               s))
            (data (buffer-substring-no-properties (point-min) (point-max)))
            (data (concat

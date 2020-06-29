@@ -1,3 +1,5 @@
+;;; -*- lexical-binding: t; -*-
+
 (require 'apigee-man-api)
 
 (defun apigee-project--build ()
@@ -98,25 +100,17 @@ that. Otherwise prompt user to choose from environments in
                           revision)))
       (pp response-data))))
 
-(defcustom apigee-project-api nil
-  "The name of the API proxy."
-  :group 'apigee
-  :type 'string)
+(defvar-local apigee-project-api nil
+  "The name of the API proxy.")
 
-(defcustom apigee-project-environment nil
-  "The environment associated with this project."
-  :group 'apigee
-  :type 'string)
+(defvar-local apigee-project--environments nil
+  "Cache output of API call.")
 
-(defcustom apigee-project-organization nil
-  "The organization associated with this project."
-  :group 'apigee
-  :type 'string)
+(defvar-local apigee-project-organization nil
+  "The organization associated with this project.")
 
-(defcustom apigee-project-template-values nil
-  "List of template values used to build the project."
-  :group 'apigee
-  :type 'alist)
+(defvar-local apigee-project-template-values nil
+  "List of template values used to build the project.")
 
 (define-minor-mode apigee-project-mode
   "Toggle Apigee Project mode."
@@ -124,36 +118,47 @@ that. Otherwise prompt user to choose from environments in
   :lighter " Apigee"
   :keymap  (let ((map (make-sparse-keymap)))
              (define-key map (kbd "\C-x \C-a i") 'apigee-project-import-api-proxy)
+             (define-key map (kbd "\C-x \C-a d") 'apigee-project-deployment)
              map)
   :group 'apigee)
 
 
 
-;;;; apigee-project-deployment stuffs
+;;;; apigee-project-deployment stuff
 
-
-
-
-
+(defvar apigee-project-deployment-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "a") 'apigee-project-deployment-deploy-marked)
+    (define-key map (kbd "r") 'apigee-project-deployment-undeploy-marked)
+    map)
+  )
 
 (define-derived-mode apigee-project-deployment-mode
   tablist-mode
-  "APD"
-  "Apigee Project Deployment"
-  )
+  "apd"
+  "Apigee Project Deployment")
 
 (defun apigee-project-deployment ()
   "See deployment status of project."
   (interactive)
+
+  ;; (pp (buffer-local-variables))
+  (unless (and apigee-project-organization
+               apigee-project-api)
+    (error "Variables apigee-project-organization and apigee-project-api must be set"))
   
   (let* ((org apigee-project-organization)
-         (env apigee-project-environment)
          (api apigee-project-api)
          (revisions (apigee-man-api-get-api-revisions org api))
          (envs (sort (apigee-man-api-list-environment-names org)
                      'string-lessp)))
     (pop-to-buffer "*Deployment*")
+    
     (apigee-project-deployment-mode)
+    (setq-local apigee-project-organization org)
+    (setq-local apigee-project-api api)
+    (setq-local apigee-project--environments envs)
+    
     (setq tabulated-list-format
           (let ((tlf '(("Rev" 3 t))))
             (apply 'vector
@@ -171,29 +176,110 @@ that. Otherwise prompt user to choose from environments in
     (tabulated-list-init-header)
     (setq tabulated-list-entries
           (mapcar (lambda (rev)
-                    (let ((row (list rev (make-vector (length tabulated-list-format) ""))))
+                    (let ((row (list (string-to-number rev) (make-vector (length tabulated-list-format) ""))))
                       (aset (nth 1 row) 0 rev)
                       row))
-                  revisions)))
-  (pp tabulated-list-entries)
-  (tabulated-list-print t))
+                  revisions))
+    (tabulated-list-print t)
+
+    (mapc ;; TODO - asyncify
+     (lambda (env)
+       (let ((response-data (apigee-man-api-get-apis-deployed-to-environment
+                             org env)))
+         (with-current-buffer "*Deployment*"
+           ;; This is dense JSON.
+           (let* ((deployments (alist-get 'aPIProxy response-data))
+                  (proxy (seq-find (lambda (proxy)
+                                     (string-equal (alist-get 'name proxy) api))
+                                   deployments))
+                  (revisions (alist-get 'revision proxy))
+                  (rev-names (seq-map (lambda (revision)
+                                        (alist-get 'name revision))
+                                      revisions)))
+             (mapc (lambda (rev-name)
+                     (let ((row (seq-find
+                                 (lambda (row)
+                                   (equal (car row) (string-to-number rev-name)))
+                                 tabulated-list-entries)))
+                       (aset (nth 1 row) 2 "Deployed")))
+                   rev-names)
+             (tabulated-list-print t)))))
+     envs))
+  (goto-char (point-min)))
 
 
+(add-to-list 'tabulated-list-revert-hook 'apigee-project-deployment--maybe-refresh)
+
+(defvar-local apigee-project-deployment--refresh nil)
+
+(defun apigee-project-deployment--maybe-refresh ()
+  "Refresh if required."
+  (when apigee-project-deployment--refresh
+    (apigee-project-deployment)
+    (setq apigee-project-deployment--refresh nil))
+  )
+
+(defun apigee-project-deployment-undeploy-marked ()
+  "Undeploy all marked revisions, ARG."
+  (interactive)
+  (tablist-do-operation current-prefix-arg
+                        'apigee-project-deployment--undeploy-marked
+                        "Undeploy revision"
+                        nil t))
+
+(defun apigee-project-deployment-deploy-marked ()
+  "Undeploy all marked revisions, ARG."
+  (interactive)
+  (tablist-do-operation current-prefix-arg
+                        'apigee-project-deployment--deploy-marked
+                        "Deploy revision"
+                        nil t))
 
 
+(defun apigee-project-deployment--get-entry-by-id (id)
+  "Get entry in `tabulated-list-entries' by ID."
+  (let ((entry (seq-find (lambda (entry_)
+                           (equal (car entry_) id))
+                         tabulated-list-entries)))
+    (unless entry
+      (error "No entry with id %s" id))
+    entry))
+
+(defun apigee-project-deployment--undeploy-marked (id &optional entry)
+  "Undeploy ENTRY marked by ID."
+  (interactive)
+  (unless entry
+    (setq entry (apigee-project-deployment--get-entry-by-id id)))
+  
+
+  (mapc (lambda (env)
+          (let ((state (aref (nth 1 entry)
+                             (tabulated-list--column-number env))))
+            (when (string-equal "Deployed" state)
+              (apigee-man-api-undeploy-api-revision apigee-project-organization
+                                                    env
+                                                    apigee-project-api
+                                                    id)
+              (setq apigee-project-deployment--refresh t))))
+        apigee-project--environments))
 
 
-
-
-
-
-
-
-
-
-
-
-
+(defun apigee-project-deployment--deploy-marked (id &optional entry)
+  "Deploy ENTRY marked by ID."
+  (interactive)
+  (unless entry
+    (setq entry (apigee-project-deployment--get-entry-by-id id)))
+  
+  (mapc (lambda (env)
+          (let ((state (aref (nth 1 entry)
+                             (tabulated-list--column-number env))))
+            (when (not (string-equal "Deployed" state))
+              (apigee-man-api-deploy-api-revision apigee-project-organization
+                                                  env
+                                                  apigee-project-api
+                                                  id)
+              (setq apigee-project-deployment--refresh t))))
+        apigee-project--environments))
 
 
 
