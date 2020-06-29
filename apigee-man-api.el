@@ -109,21 +109,19 @@ calling CALLBACK with the `json-read' data returned."
                                    :callback callback)))
 
 ;; APIs
-(cl-defun apigee-man-api-get-api (organization api)
+(defun apigee-man-api-get-api (organization api)
   "Get details of API from ORGANIZATION."
   (apigee-man-api--request (format "organizations/%s/apis/%s" organization api)))
 
-(cl-defun apigee-man-api-get-api-revisions (organization api)
+(defun apigee-man-api-get-api-revisions (organization api)
   "Get details of API REVSION from ORGANIZATION."
   (apigee-man-api--request (format "organizations/%s/apis/%s/revisions"
                                    organization api)))
 
-(cl-defun apigee-man-api-get-api-revision (organization api revision)
+(defun apigee-man-api-get-api-revision (organization api revision)
   "Get details of API REVSION from ORGANIZATION."
   (apigee-man-api--request (format "organizations/%s/apis/%s/revisions/%d"
                                    organization api revision)))
-
-
 
 (defun apigee-man-api-deploy-api-revision (organization
                                            environment
@@ -155,8 +153,14 @@ calling CALLBACK with the `json-read' data returned."
                            :confirm (format "Undeploy %s rev %d from %s?" api revision environment)))
 
 
-
-
+(defun apigee-man-api-delete-api-revision (organization api revision)
+  "Delete API REVISION from ORGANIZATION."
+  (apigee-man-api--request (format "organizations/%s/apis/%s/revisions/%d"
+                                   organization
+                                   api
+                                   revision)
+                           :method "DELETE"
+                           :confirm (format "Delete %s rev %d?" api revision)))
 
 (cl-defun apigee-man-api-import-api (organization api zip-file-name
                                                   &key (action "validate"))

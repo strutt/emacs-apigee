@@ -136,7 +136,9 @@ that. Otherwise prompt user to choose from environments in
 (define-derived-mode apigee-project-deployment-mode
   tablist-mode
   "apd"
-  "Apigee Project Deployment")
+  "Apigee Project Deployment"
+  (setq-local tablist-operations-function 'apigee-project-deployment--operate))
+
 
 (defun apigee-project-deployment ()
   "See deployment status of project."
@@ -281,6 +283,24 @@ that. Otherwise prompt user to choose from environments in
               (setq apigee-project-deployment--refresh t))))
         apigee-project--environments))
 
+
+(defun apigee-project-deployment--operate (operation &rest args)
+  "Do OPERATION on selected entries."
+  (cond ((eq operation 'supported-operations)
+         '(delete) )
+
+        ((eq operation 'delete)
+         (apigee-project-deployment--delete-marked (car args)))
+        ))
+
+(defun apigee-project-deployment--delete-marked (ids)
+  "Delete entries with IDS."
+  (mapc (lambda (revision)
+          (apigee-man-api-delete-api-revision apigee-project-organization
+                                              apigee-project-api
+                                              revision)
+          (setq-local apigee-project-deployment--refresh t))
+        ids))
 
 
 
