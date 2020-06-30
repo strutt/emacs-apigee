@@ -41,6 +41,7 @@
                                    callback
                                    data
                                    (content-type "application/json")
+                                   (accept "application/json")
                                    (method "GET")
                                    (confirm nil))
   "Make a request to `apigee-man-api-root-url' ENDPOINT.
@@ -57,6 +58,7 @@ If CALLBACK is provided then endpoint is retrieved asynchronously
 calling CALLBACK with the `json-read' data returned."
   (let* ((url-request-method method)
          (url-request-data data)
+         (url-mime-accept-string accept)
          (url-request-extra-headers `(,(apigee-auth-header)
                                       ("content-type" . ,content-type)))
          (url (format "%s/%s" apigee-man-api-root-url endpoint))
@@ -75,6 +77,7 @@ calling CALLBACK with the `json-read' data returned."
               (not apigee-man-api-send-data-confirm)
               (y-or-n-p (if (stringp confirm) confirm
                           (format "%s %s to %s? " method url-request-data url))))
+
       (with-current-buffer
           ;; Try to refresh token and try again if we have an error
           ;; thrown, this could be improved.
@@ -175,7 +178,7 @@ ACTION should be either \"import\" or \"validate\", defaults to \"validate\"."
 
   (with-temp-buffer
     (insert-file-contents-literally zip-file-name)
-    
+
     (let* ((multi-part-boundary ;; Random string
             (let ((s "abcdefghijkl"))
               (dotimes (i (length s))
@@ -196,6 +199,108 @@ ACTION should be either \"import\" or \"validate\", defaults to \"validate\"."
        :content-type (format "multipart/form-data; boundary=%s" multi-part-boundary)
        :confirm (string-equal action "import")
        :data data))))
+
+
+;; Debugging involves the following steps:
+;; 1. Start a debug session by creating a debug session.
+;; 2. Send a message for that deployed API proxy.
+;; 3. Retrieve the debug data associated with the debug session. The data can be fetched by issuing a GET call on the session.
+;; 4. Close the debug session. (Closing the debug session discards all the associated data).
+(cl-defun apigee-man-api-create-debug-session (organization
+                                               environment
+                                               api
+                                               revision
+                                               session
+                                               &key
+                                               timeout)
+  "Create debug session SESSION for API/REVISION deployed to ENVIRONMENT in ORGANIZATION."
+  (let ((query-params
+         (if timeout
+             (format "session=%s&timeout=%d" session timeout)
+           (format "session=%s" session))))
+    (apigee-man-api--request
+     (format "organizations/%s/environments/%s/apis/%s/revisions/%d/debugsessions?%s"
+             organization
+             environment
+             api
+             revision
+             query-params)
+     :method "POST"
+     :content-type "application/x-www-url-form-encoded"
+     :data " "
+     :confirm t)))
+
+(defun apigee-man-api-list-debug-sessions (organization
+                                           environment
+                                           api
+                                           revision)
+  "List debug sessions for API/REVISION deployed to ENVIRONMENT in ORGANIZATION."
+  (apigee-man-api--request
+   (format "organizations/%s/environments/%s/apis/%s/revisions/%d/debugsessions"
+           organization
+           environment
+           api
+           revision)))
+
+(defun apigee-man-api-delete-debug-session (organization
+                                            environment
+                                            api
+                                            revision
+                                            session)
+  "Delete debug session SESSION for API/REVISION deployed to ENVIRONMENT in ORGANIZATION."
+  (apigee-man-api--request
+   (format "organizations/%s/environments/%s/apis/%s/revisions/%d/debugsessions/%s"
+           organization
+           environment
+           api
+           revision
+           session)
+   :method "DELETE"))
+
+(defun apigee-man-api-get-debug-session-transaction-ids (organization
+                                                         environment
+                                                         api
+                                                         revision
+                                                         session)
+  "List transaction IDs for debug SESSION of API/REVISION deployed to ENVIRONMENT in ORGANIZATION."
+  (apigee-man-api--request
+   (format "organizations/%s/environments/%s/apis/%s/revisions/%d/debugsessions/%s/data"
+           organization
+           environment
+           api
+           revision
+           session)))
+
+
+(cl-defun apigee-man-api-get-debug-session-transaction-data (organization
+                                                             environment
+                                                             api
+                                                             revision
+                                                             session
+                                                             transaction-id
+                                                             &key accept)
+  "Get data for TRANSACTION-ID for debug SESSION of API/REVISION deployed to ENVIRONMENT in ORGANIZATION."
+  (unless (member accept '("application/json" "application/xml"))
+    (error (format "Invalid accept value: %s" accept)))
+
+  (apigee-man-api--request
+   (format "organizations/%s/environments/%s/apis/%s/revisions/%d/debugsessions/%s/data/%s"
+           organization
+           environment
+           api
+           revision
+           session
+           transaction-id)
+   :accept accept
+   ))
+
+
+
+
+
+
+
+
 
 ;; KVMs
 (cl-defun apigee-man-api-list-kvms (organization

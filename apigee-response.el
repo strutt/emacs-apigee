@@ -12,8 +12,18 @@
         (progn
           (pop-to-buffer (current-buffer))
           (error "Invalid request in %s" (current-buffer)))
-      (search-forward "\n\n") ;; Find the blank line
-      (json-read))))
+      (let ((content-type nil))
+        (save-excursion
+          (save-match-data
+            (re-search-forward "Content-Type: \\(.+\\)" nil t)
+            (setq content-type (match-string-no-properties 1))))
+        (search-forward "\n\n");; Find the blank line
+        (cond ((string-equal content-type "application/json")
+               (json-read))
+              ((string-equal content-type "application/xml")
+               (xml-parse-region (point) (point-max)))
+              (t
+               (buffer-substring-no-properties (point) (point-max))))))))
 
 (provide 'apigee-response)
 ;;; apigee-response.el ends here

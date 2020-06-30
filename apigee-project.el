@@ -180,13 +180,12 @@ that. Otherwise prompt user to choose from environments in
                     tlf
                     (mapcar (lambda (env)
                               (list env
-                                    (max (length "deployed")
+                                    (max (length "Deployed")
                                          (length env))
                                     t))
                             envs)))))
     (setq tabulated-list-padding 1)
     (setq tabulated-list-sort-key (cons "Rev" nil))
-    (pp tabulated-list-format)
     (tabulated-list-init-header)
     (setq tabulated-list-entries
           (mapcar (lambda (rev)
