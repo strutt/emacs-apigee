@@ -6,28 +6,31 @@ An ergonomic way to interact with your Google Apigee organisation(s).
 There's another Emacs user on my current project. The fact that this
 is public is for him.
 
-Is there a term for pre-alpha? If there was, I would label this
-project with it. There's no well defined API or releases, and things
-are rapidly changing as I get to grips with Apigee and my team's work
-flow, and that is also changing rapidly. Many features are only
-partially completed and things are rather incomplete. There's also no
-regression testing, and limited documentation. This will get improved.
+This project is pre-alpha. There's no well defined API or releases,
+and things are rapidly changing as I get to grips with Apigee and my
+team's work flow, and that is also changing rapidly. The feature set
+is rather incomplete and what's there may well only be partially
+implemented. There's also no regression testing, and limited
+documentation. Configuration instructions may well be out of date
+extremely quickly. Sorry.
 
-There are quite a few major and minor modes knocking around this code
-base that could, and probably should, be amalgamated.
+That said, I'm using what is here every day and therefore the code
+should be extended and improved rapidly. For example: there are quite
+a few major and minor modes knocking around this code base that could,
+and probably should, be amalgamated.
 
-Therefore configuration instructions may well be out of date extremely
-quickly. With that said...
+With that long disclaimer out of the way...
 
 * Installation
 
 With the project in such a messy state I've not done anything about
 packaging.
 
-Therefore: clone this repo, and load the elisp in dired (with L).
+Therefore: clone this repo somewhere, and load the elisp in dired
+(with L).
 
 Currently the only pre-requisite that is not packaged with Emacs is
-tablist.el.
+[[https://github.com/politza/tablist][tablist.el]]. Install it via your chosen Emacs package manager.
 
 * Configuration
 
@@ -47,7 +50,7 @@ something like the following:
                    (when (eq major-mode 'nxml-mode)
                      (apigee-xml-mode))
                    ))
-         
+
          ))
  (nxml-mode . ((eval . (add-to-list 'xref-backend-functions 'apigee-step-xref-backend)))))
  #+end_src
@@ -55,12 +58,13 @@ something like the following:
 See [[./apigee-project.el][apigee-project.el]] for a description of the apigee-project
 variables. Briefly, there is a pure elisp deployment method for an api
 proxy that you are in the source tree of. The implementation will
-"compile" this source tree by copying it and performing template
-substitution in for the alist =apigee-project-template-values=. You
-can then to deploy it to the next revision of the api called
-=apigee-project-api=.
+"compile" this source tree by copying it, and performing template
+substitutions defined by the =apigee-project-template-values=
+alist. You can then to deploy it to the next revision of the api
+called =apigee-project-api=.
 
-The point of this is a rapid develop/deploy/test cycle without leaving
-emacs.
+The point of this scheme is a rapid develop/deploy/test cycle without
+leaving emacs.
 
-There's also some code to interact with key value maps. 
+There's also some code to interact with key value maps but it's less
+well thought out, which is saying something.
