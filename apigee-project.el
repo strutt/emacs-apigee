@@ -156,7 +156,6 @@ that. Otherwise prompt user to choose from environments in
   "See deployment status of project."
   (interactive)
 
-  ;; (pp (buffer-local-variables))
   (unless (and apigee-project-organization
                apigee-project-api)
     (error "Variables apigee-project-organization and apigee-project-api must be set"))
@@ -189,7 +188,8 @@ that. Otherwise prompt user to choose from environments in
     (tabulated-list-init-header)
     (setq tabulated-list-entries
           (mapcar (lambda (rev)
-                    (let ((row (list (string-to-number rev) (make-vector (length tabulated-list-format) ""))))
+                    (let ((row (list (string-to-number rev)
+                                     (make-vector (length tabulated-list-format) ""))))
                       (aset (nth 1 row) 0 rev)
                       row))
                   revisions))
