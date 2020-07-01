@@ -1,0 +1,66 @@
+#+TITLE: apigee.el
+
+An ergonomic way to interact with your Google Apigee organisation(s).
+
+* Introduction
+There's another Emacs user on my current project. The fact that this
+is public is for him.
+
+Is there a term for pre-alpha? If there was, I would label this
+project with it. There's no well defined API or releases, and things
+are rapidly changing as I get to grips with Apigee and my team's work
+flow, and that is also changing rapidly. Many features are only
+partially completed and things are rather incomplete. There's also no
+regression testing, and limited documentation. This will get improved.
+
+There are quite a few major and minor modes knocking around this code
+base that could, and probably should, be amalgamated.
+
+Therefore configuration instructions may well be out of date extremely
+quickly. With that said...
+
+* Installation
+
+With the project in such a messy state I've not done anything about
+packaging.
+
+Therefore: clone this repo, and load the elisp in dired (with L).
+
+Currently the only pre-requisite that is not packaged with Emacs is
+tablist.el.
+
+* Configuration
+
+In your project root directory create a =.dir-locals.el= file with the
+something like the following:
+
+#+begin_src emacs-lisp
+;;; Directory Local Variables
+;;; For more information see (info "(emacs) Directory Variables")
+
+((nil . ((apigee-project-api . "your-api-name")
+         (apigee-project-organization . "your-organization-name")
+         (apigee-project-template-values . (("{{ TEMPLATE_MARKER_1 }}" . "value1-to-insert")
+                                            ("{{ TEMPLATE_MARKER_2 }}" . "value2-to-insert")))
+         (eval . (progn
+                   (apigee-project-mode)
+                   (when (eq major-mode 'nxml-mode)
+                     (apigee-xml-mode))
+                   ))
+         
+         ))
+ (nxml-mode . ((eval . (add-to-list 'xref-backend-functions 'apigee-step-xref-backend)))))
+ #+end_src
+
+See [[./apigee-project.el][apigee-project.el]] for a description of the apigee-project
+variables. Briefly, there is a pure elisp deployment method for an api
+proxy that you are in the source tree of. The implementation will
+"compile" this source tree by copying it and performing template
+substitution in for the alist =apigee-project-template-values=. You
+can then to deploy it to the next revision of the api called
+=apigee-project-api=.
+
+The point of this is a rapid develop/deploy/test cycle without leaving
+emacs.
+
+There's also some code to interact with key value maps. 
