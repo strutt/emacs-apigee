@@ -28,7 +28,10 @@
          (api-names (mapcar (lambda (proxy)
                               (alist-get 'name proxy))
                             (alist-get 'aPIProxy env-apis)))
-         (apis (mapcar 'apigee-man-api-get-api api-names))
+         (apis (mapcar (lambda (api-name)
+                         ;; TODO get organization more sensibly
+                         (apigee-man-api-get-api (car apigee-man-organizations) api-name))
+                       api-names))
          (api-last-modified-ats (mapcar (lambda (api)
                                           (apigee-man--api-metadata-timestamp-to-string
                                            (alist-get 'lastModifiedAt (alist-get 'metaData api))))
@@ -45,8 +48,7 @@
                  api-name ;; API name
                  )))
              api-names
-             api-last-modified-ats
-             )))
+             api-last-modified-ats)))
 
 
 (defun apigee-man ()
@@ -56,8 +58,7 @@
          (environments (apigee-man-api-list-environment-names org))
          (apis (mapcar
                 (lambda (env)
-                  apigee-man-api-get-apis-deployed-to-environment org env)
-                org
+                  (apigee-man-api-get-apis-deployed-to-environment org env))
                 environments))
          (rows-list (mapcar
                      'apigee-man--api-to-table-row
@@ -75,14 +76,12 @@
 (defvar apigee-man-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map [?m] 'apigee-man--list-key-value-maps)
-    map
-    )
-  )
+    map))
 
 
 (define-derived-mode
   apigee-man-mode
-  tabulated-list-mode
+  tablist-mode
   "apigee"
   "Manage Apigee from the one true editor."
 
