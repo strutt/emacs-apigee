@@ -79,8 +79,7 @@ ARGS are the for nxml-fontify-matcher."
                   (set-text-properties (+ beg str-pos)
                                        (+ beg next-pos-safe)
                                        (text-properties-at str-pos fontified-string))
-                  (setq str-pos next-pos))))))
-        ))
+                  (setq str-pos next-pos))))))))
     res))
 
 

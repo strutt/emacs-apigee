@@ -16,11 +16,13 @@
         (save-excursion
           (save-match-data
             (re-search-forward "Content-Type: \\(.+\\)" nil t)
-            (setq content-type (match-string-no-properties 1))))
+            (setq content-type (split-string
+                                (match-string-no-properties 1)
+                                ";"))))
         (search-forward "\n\n");; Find the blank line
-        (cond ((string-equal content-type "application/json")
+        (cond ((member "application/json" content-type)
                (json-read))
-              ((string-equal content-type "application/xml")
+              ((member "application/xml" content-type)
                (xml-parse-region (point) (point-max)))
               (t
                (buffer-substring-no-properties (point) (point-max))))))))
