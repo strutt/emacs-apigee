@@ -5,6 +5,10 @@
 
 (defvar apigee-auth--access-token nil "Current access token.")
 (defvar apigee-auth--refresh-token nil "Current refresh token.")
+(defvar apigee-auth-mfa-code-func nil
+  "Function to call to get MFA code.
+
+If nil then you will be prompted for your MFA code in the minibuffer.")
 
 (defconst apigee-auth--token-extra-headers
   '(("content-type" . "application/x-www-form-urlencoded;charset=utf-8")
@@ -37,7 +41,9 @@ https://docs.apigee.com/api-platform/system-administration/management-api-tokens
     (if secret
         (setq secret (funcall secret))
       (setq user (read-string "Enter password: ")))
-    (setq mfa-code (read-string (format "Enter MFA code for %s: " user)))
+    (if apigee-auth-mfa-code-func
+        (setq mfa-code (funcall apigee-auth-mfa-code-func))
+      (setq mfa-code (read-string (format "Enter MFA code for %s: " user))))
 
     (let ((url (format "https://login.apigee.com/oauth/token?mfa_token=%s" mfa-code))
           (url-request-data (format "username=%s&password=%s&grant_type=password"
