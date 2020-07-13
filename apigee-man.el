@@ -11,10 +11,11 @@
   (interactive)
   ;; aref indices must match `tabulated-list-format'
   (let* ((api-name (aref (tabulated-list-get-entry) 2))
-         (api-kvms (apigee-man-api-list-kvms :api api-name))
+         (org (car apigee-man-organizations))
+         (api-kvms (apigee-man-api-list-kvms org :api api-name))
          (environment (aref (tabulated-list-get-entry) 1))
-         (env-kvms (apigee-man-api-list-kvms :environment environment))
-         (org-kvms (apigee-man-api-list-kvms :organization t)))
+         (env-kvms (apigee-man-api-list-kvms org :environment environment))
+         (org-kvms (apigee-man-api-list-kvms org)))
     (apigee-man-kvms api-kvms env-kvms org-kvms api-name environment)))
 
 (defun apigee-man--api-metadata-timestamp-to-string (timestamp)

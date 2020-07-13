@@ -300,8 +300,6 @@ ACTION should be either \"import\" or \"validate\", defaults to \"validate\"."
 
 
 
-
-
 ;; KVMs
 (cl-defun apigee-man-api-list-kvms (organization
                                     &key
@@ -316,10 +314,10 @@ then ENVIRONMENT, then ORGANIZATION if nothing else is provided."
   (unless (or api environment organization)
     (user-error "Must specify one of API, ENVIRONMENT, ORGANIZATION"))
   (let ((endpoint (cond (api
-                         (format "organizations/%s/apis/%s/keyvaluemaps" api))
+                         (format "organizations/%s/apis/%s/keyvaluemaps" organization api))
                         (environment
-                         (format "organizations/%s/environments/%s/keyvaluemaps" environment))
-                        (organization "organizations/%s/keyvaluemaps"))))
+                         (format "organizations/%s/environments/%s/keyvaluemaps" organization environment))
+                        (organization (format "organizations/%s/keyvaluemaps" organization)))))
     (apigee-man-api--request endpoint)))
 
 
