@@ -24,9 +24,9 @@
       (message "Deleting %s" dest-dir))
 
     ;; Copy the source tree to tempdir.
-    (dired-copy-file-recursive (concat src-dir "apiproxy")
-                               dest-dir
-                               nil nil nil 'always)
+    (copy-directory (concat src-dir "apiproxy/")
+                    dest-dir
+                    t nil t)
 
     ;; "Compile" the project, i.e. replace all instances of template
     ;; keys with values.
