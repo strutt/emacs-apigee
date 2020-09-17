@@ -112,6 +112,13 @@ calling CALLBACK with the `json-read' data returned."
                                    :callback callback)))
 
 ;; APIs
+(defun apigee-man-api-create-api (organization api)
+  "Create an API in ORGANIZATION."
+  (apigee-man-api--request (format "organizations/%s/apis/" organization)
+                           :method "POST"
+                           :content-type "application/json"
+                           :data (json-encode `((name . ,api)))))
+
 (defun apigee-man-api-get-api (organization api)
   "Get details of API from ORGANIZATION."
   (apigee-man-api--request (format "organizations/%s/apis/%s" organization api)))
@@ -176,29 +183,27 @@ ACTION should be either \"import\" or \"validate\", defaults to \"validate\"."
   (unless (file-exists-p zip-file-name)
     (user-error (format "No such file %s" zip-file-name)))
 
-  (with-temp-buffer
-    (insert-file-contents-literally zip-file-name)
-
-    (let* ((multi-part-boundary ;; Random string
-            (let ((s "abcdefghijkl"))
-              (dotimes (i (length s))
-                (aset s i (aref "abcdefghijklmnopqrstuvwxyz0123456789" (random 36))))
-              s))
-           (data (buffer-substring-no-properties (point-min) (point-max)))
-           (data (concat
-                  "--" multi-part-boundary "\r\n"
-                  "Content-Disposition: form-data; name=file; filename=apiproxy.zip\r\n"
-                  "\r\n"
-                  data "\r\n"
-                  "\r\n"
-                  "--" multi-part-boundary "\r\n" ))
-           (data (encode-coding-string data 'binary)))
-      (apigee-man-api--request
-       (format "organizations/%s/apis?name=%s&action=%s" organization api action)
-       :method "POST"
-       :content-type (format "multipart/form-data; boundary=%s" multi-part-boundary)
-       :confirm (string-equal action "import")
-       :data data))))
+  (let ((multi-part-boundary ;; Random string
+         (let ((s "abcdefghijkl"))
+           (dotimes (i (length s))
+             (aset s i (aref "abcdefghijklmnopqrstuvwxyz0123456789" (random 36))))
+           s)))
+    (apigee-man-api--request
+     (format "organizations/%s/apis?name=%s&action=%s" organization api action)
+     :method "POST"
+     :content-type (format "multipart/form-data; boundary=%s" multi-part-boundary)
+     :confirm (string-equal action "import")
+     :data (with-temp-buffer
+             (insert-file-contents-literally zip-file-name)
+             (let* ((data (buffer-substring-no-properties (point-min) (point-max)))
+                    (data (concat
+                           "--" multi-part-boundary "\r\n"
+                           "Content-Disposition: form-data; name=file; filename=apiproxy.zip\r\n"
+                           "\r\n"
+                           data "\r\n"
+                           "\r\n"
+                           "--" multi-part-boundary "\r\n" )))
+               (encode-coding-string data 'binary))))))
 
 
 ;; Debugging involves the following steps:
