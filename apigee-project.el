@@ -51,9 +51,6 @@
     zip-file-name))
 
 
-(defun apigee-project-api-proxy-name ()
-  "identity-service-internal-dev-apm-1010-reduce-default-refresh-token-expiry")
-
 (defun apigee-project-import-api-proxy (arg)
   "Validate the API proxy.
 
@@ -88,7 +85,7 @@ that. Otherwise prompt user to choose from environments in
   (unless (integerp revision)
     (user-error (format "Invalid revision %s" revision)))
 
-  (let* ((env apigee-project-environment)
+  (let* ((env apigee-project--environment)
          (envs (apigee-man-api-list-environment-names apigee-project-organization)))
     (unless (seq-contains envs env 'string-equal)
       (setq env (completing-read (format "Select environment to deploy %s to: " apigee-project-api)  envs nil t)))
@@ -100,17 +97,55 @@ that. Otherwise prompt user to choose from environments in
                           revision)))
       (pp response-data))))
 
-(defvar-local apigee-project-api nil
-  "The name of the API proxy.")
-
-(defvar-local apigee-project--environments nil
-  "Cache output of API call.")
-
-(defvar-local apigee-project-organization nil
+(defcustom apigee-project-organization nil
   "The organization associated with this project.")
 
-(defvar-local apigee-project-template-values nil
+(defcustom apigee-project-template-values nil
   "List of template values used to build the project.")
+
+(defvar apigee-project--environment nil
+  "Default environment to deploy to.")
+
+(defun apigee-project-select-environment (prompt &optional organization)
+  "PROMPT user to select an environment in ORGANIZATION."
+  (unless organization
+    (setq organization apigee-project-organization))
+
+  (let ((env (completing-read
+              prompt
+              (apigee-project-environments organization)
+              nil t apigee-project--environment)))
+
+    (setq apigee-project--environment env)))
+
+(defvar apigee-project-api nil
+  "The name of the API proxy under development.")
+
+(defvar apigee-project--environments nil
+  "Alist of environments available per apigee organization.
+See `apigee-project-environments'.")
+
+(defun apigee-project-environments (&optional organization)
+  "List of environments that exist in ORGANIZATION.
+
+This is the recommended way to access the list of environments
+available in the organization.
+
+The environments are cached per-organization after the first API
+call.  To remove the cached entry edit
+`apigee-project--environments' to remove the alist key or set the
+whole alist to nil."
+  (unless organization
+    (setq organization apigee-project-organization))
+
+  (or (alist-get organization apigee-project--environments)
+      (let* ((envs (sort (apigee-man-api-list-environment-names organization)
+                         'string-lessp))
+             (envs (seq-into envs 'list)))
+        (setq apigee-project--environments
+              (cons `(,organization . ,envs) apigee-project--environments))
+        envs)))
+
 
 (define-minor-mode apigee-project-mode
   "Toggle Apigee Project mode."
@@ -121,19 +156,6 @@ that. Otherwise prompt user to choose from environments in
              (define-key map (kbd "\C-x \C-a \C-d") 'apigee-project-deployment)
              map)
   :group 'apigee)
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -163,15 +185,16 @@ that. Otherwise prompt user to choose from environments in
   (let* ((org apigee-project-organization)
          (api apigee-project-api)
          (revisions (apigee-man-api-get-api-revisions org api))
-         (envs (sort (apigee-man-api-list-environment-names org)
-                     'string-lessp)))
+         (envs (apigee-project-environments org)))
+
     (pop-to-buffer "*Deployment*")
-    
     (apigee-project-deployment-mode)
+
+    ;; In case these are environment variables.
     (setq-local apigee-project-organization org)
     (setq-local apigee-project-api api)
     (setq-local apigee-project--environments (seq-map 'identity envs))
-    
+
     (setq tabulated-list-format
           (let ((tlf '(("Rev" 3 (lambda (a b) (< (car a) (car b)))))))
             (apply 'vector
