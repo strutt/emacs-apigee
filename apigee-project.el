@@ -35,11 +35,8 @@
       (save-excursion
         (mapc (lambda (file-name)
                 (with-temp-buffer
-                  (insert-file-contents file-name)
-                  (mapc (lambda (template)
-                          (goto-char (point-min))
-                          (replace-string (car template) (cdr template)))
-                        templates)
+                  (insert-file-contents-literally file-name)
+                  (apigee-jinja2-render)
                   (write-file file-name)))
               file-names)))
 
@@ -65,15 +62,41 @@ returns nil."
                          apigee-project-api
                          zip-file-name
                          :action action))
-         (revision (when arg
-                     (alist-get 'revision response-data))))
+         (uploaded-revision (when arg
+                              (string-to-number (alist-get 'revision response-data)))))
     (delete-file zip-file-name)
     (delete-directory
      (concat (file-name-directory zip-file-name)
              (file-name-base zip-file-name))
      t)
-    
-    revision))
+    (when uploaded-revision
+      (message "Uploaded new revision: %d" uploaded-revision)
+      (when (y-or-n-p (format "Deploy new revision %d? " uploaded-revision
+                              apigee-project--environment))
+        (let* ((env (apigee-project-select-environment
+                     (format "Deploy new revision %d to: " uploaded-revision)))
+               (deployments (apigee-man-api-get-api-deployments-in-environment
+                             apigee-project-organization
+                             env
+                             apigee-project-api)))
+
+          ;; Undeploy all deployed revision in `env'
+          (seq-do
+           (lambda (deployment)
+             (let ((revision (string-to-number (alist-get 'name deployment))))
+               (apigee-man-api-undeploy-api-revision
+                apigee-project-organization
+                env
+                apigee-project-api
+                revision)))
+           (alist-get 'revision deployments))
+
+          ;; Deploy new revision to `env'
+          (apigee-man-api-deploy-api-revision
+           apigee-project-organization
+           env
+           apigee-project-api
+           uploaded-revision))))))
 
 (defun apigee-project-deploy-api-proxy (revision)
   "Deploy your API at REVISION.
@@ -100,9 +123,6 @@ that. Otherwise prompt user to choose from environments in
 (defcustom apigee-project-organization nil
   "The organization associated with this project.")
 
-(defcustom apigee-project-template-values nil
-  "List of template values used to build the project.")
-
 (defvar apigee-project--environment nil
   "Default environment to deploy to.")
 
@@ -110,7 +130,7 @@ that. Otherwise prompt user to choose from environments in
   "PROMPT user to select an environment in ORGANIZATION."
   (unless organization
     (setq organization apigee-project-organization))
-
+  
   (let ((env (completing-read
               prompt
               (apigee-project-environments organization)
@@ -190,7 +210,7 @@ whole alist to nil."
     (pop-to-buffer "*Deployment*")
     (apigee-project-deployment-mode)
 
-    ;; In case these are environment variables.
+    ;; In case these are per-project dir-local variables.
     (setq-local apigee-project-organization org)
     (setq-local apigee-project-api api)
     (setq-local apigee-project--environments (seq-map 'identity envs))
@@ -219,28 +239,15 @@ whole alist to nil."
     (tabulated-list-print t)
 
     (mapc ;; TODO - asyncify
-     (lambda (env)
-       (let ((response-data (apigee-man-api-get-apis-deployed-to-environment
-                             org env)))
+     (lambda (rev)
+       (let* ((deployments (alist-get 'environments (apigee-man-api-get-api-revision-deployments org api rev))))
          (with-current-buffer "*Deployment*"
-           ;; This is dense JSON.
-           (let* ((deployments (alist-get 'aPIProxy response-data))
-                  (proxy (seq-find (lambda (proxy)
-                                     (string-equal (alist-get 'name proxy) api))
-                                   deployments))
-                  (revisions (alist-get 'revision proxy))
-                  (rev-names (seq-map (lambda (revision)
-                                        (alist-get 'name revision))
-                                      revisions)))
-             (mapc (lambda (rev-name)
-                     (let ((row (seq-find
-                                 (lambda (row)
-                                   (equal (car row) (string-to-number rev-name)))
-                                 tabulated-list-entries)))
-                       (aset (nth 1 row) 2 "Deployed")))
-                   rev-names)
-             (tabulated-list-print t)))))
-     envs))
+           
+           )
+         )
+       )
+     (mapcar 'car tabulated-list-entries)
+     ))
   (goto-char (point-min)))
 
 
@@ -300,18 +307,15 @@ whole alist to nil."
   (interactive)
   (unless entry
     (setq entry (apigee-project-deployment--get-entry-by-id id)))
-  (let ((envs (completing-read-multiple "Select environments: "
-                                        apigee-project--environments
-                                        (lambda (env)
-                                          (not (string-equal
-                                                "Deployed"
-                                                (aref (nth 1 entry)
-                                                      (tabulated-list--column-number env)))))
-                                        ;; nil
-                                        t
-                                        nil
-                                        t
-                                        )))
+  
+  (let* ((envs (completing-read-multiple "Select environments: "
+                                         apigee-project--environments
+                                         nil
+                                         ;; nil
+                                         t
+                                         nil
+                                         t
+                                         )))
     (mapc (lambda (env)
             (apigee-man-api-deploy-api-revision apigee-project-organization
                                                 env
