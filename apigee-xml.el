@@ -37,10 +37,9 @@
   :group 'apigee
   
   (when apigee-xml-mode
-    (progn 
-      (unless (advice-member-p 'apigee-xml--fontify-matcher-advice 'nxml-fontify-matcher)
-        (advice-add 'nxml-fontify-matcher :around #'apigee-xml--fontify-matcher-advice))
-      (font-lock-flush))))
+    (unless (advice-member-p 'apigee-xml--fontify-matcher-advice 'nxml-fontify-matcher)
+      (advice-add 'nxml-fontify-matcher :around #'apigee-xml--fontify-matcher-advice))
+    (font-lock-flush)))
 
 (defun apigee-xml--fontify-matcher-advice (orig-fun &rest args)
   "Advice for nxml-fontify-matcher.
