@@ -130,7 +130,7 @@ that. Otherwise prompt user to choose from environments in
   "PROMPT user to select an environment in ORGANIZATION."
   (unless organization
     (setq organization apigee-project-organization))
-  
+
   (let ((env (completing-read
               prompt
               (apigee-project-environments organization)
@@ -195,13 +195,13 @@ whole alist to nil."
 
 
 (defun apigee-project-deployment ()
-  "See deployment status of project."
+  "See deployment status of `apigee-project-api' in `apigee-project-organization'."
   (interactive)
 
   (unless (and apigee-project-organization
                apigee-project-api)
     (error "Variables apigee-project-organization and apigee-project-api must be set"))
-  
+
   (let* ((org apigee-project-organization)
          (api apigee-project-api)
          (revisions (apigee-man-api-get-api-revisions org api))
@@ -210,13 +210,14 @@ whole alist to nil."
     (pop-to-buffer "*Deployment*")
     (apigee-project-deployment-mode)
 
-    ;; In case these are per-project dir-local variables.
+    ;; In case these are per-project dir-local variables.  There's
+    ;; probably a more elegant way to do this.
     (setq-local apigee-project-organization org)
     (setq-local apigee-project-api api)
     (setq-local apigee-project--environments (seq-map 'identity envs))
 
     (setq tabulated-list-format
-          (let ((tlf '(("Rev" 3 (lambda (a b) (< (car a) (car b)))))))
+          (let ((tlf '(("Rev" 3 (lambda (a b) (> (car a) (car b)))))))
             (apply 'vector
                    (append
                     tlf
@@ -238,16 +239,24 @@ whole alist to nil."
                   revisions))
     (tabulated-list-print t)
 
-    (mapc ;; TODO - asyncify
-     (lambda (rev)
-       (let* ((deployments (alist-get 'environments (apigee-man-api-get-api-revision-deployments org api rev))))
-         (with-current-buffer "*Deployment*"
-           
-           )
-         )
-       )
-     (mapcar 'car tabulated-list-entries)
-     ))
+    (apigee-man-api-get-api-deployments
+     org api
+     :callback
+     (lambda (deployments)
+       (with-current-buffer "*Deployment*"
+         (seq-do
+          (lambda (environment)
+            (let ((env (alist-get 'name environment)))
+              (seq-do
+               (lambda (revision)
+                 (let* ((revision (string-to-number (alist-get 'name revision)))
+                        (entry (seq-find
+                                (lambda (row) (= (car row) revision))
+                                tabulated-list-entries)))
+                   (aset (cadr entry) (tabulated-list--column-number env) "Deployed")))
+               (alist-get 'revision environment))))
+          (alist-get 'environment deployments))
+         (tabulated-list-print t)))))
   (goto-char (point-min)))
 
 
@@ -307,7 +316,7 @@ whole alist to nil."
   (interactive)
   (unless entry
     (setq entry (apigee-project-deployment--get-entry-by-id id)))
-  
+
   (let* ((envs (completing-read-multiple "Select environments: "
                                          apigee-project--environments
                                          nil

@@ -133,15 +133,28 @@ calling CALLBACK with the `json-read' data returned."
   (apigee-man-api--request (format "organizations/%s/apis/%s/revisions/%d"
                                    organization api revision)))
 
+
+;; Deployments
+
+(cl-defun apigee-man-api-get-api-deployments (organization api
+                                                           &key
+                                                           (callback nil))
+  "Get deployment details of API from ORGANIZATION."
+  (apigee-man-api--request (format "organizations/%s/apis/%s/deployments"
+                                   organization api)
+                           :callback callback))
+
 (defun apigee-man-api-get-api-revision-deployments (organization api revision)
   "Get deployment details of API REVISION from ORGANIZATION."
   (apigee-man-api--request (format "organizations/%s/apis/%s/revisions/%d/deployments"
                                    organization api revision)))
 
-(defun apigee-man-api-get-api-deployments-in-environment (organization environment api)
+(cl-defun apigee-man-api-get-api-deployments-in-environment (organization environment api
+                                                                          &key (callback nil))
   "Get deployment details of all API revision in ENVIRONMENT from ORGANIZATION."
   (apigee-man-api--request (format "organizations/%s/environments/%s/apis/%s/deployments"
-                                   organization environment api)))
+                                   organization environment api)
+                           :callback callback))
 
 (defun apigee-man-api-deploy-api-revision (organization
                                            environment
