@@ -129,9 +129,19 @@ calling CALLBACK with the `json-read' data returned."
                                    organization api)))
 
 (defun apigee-man-api-get-api-revision (organization api revision)
-  "Get details of API REVSION from ORGANIZATION."
+  "Get details of API REVISION from ORGANIZATION."
   (apigee-man-api--request (format "organizations/%s/apis/%s/revisions/%d"
                                    organization api revision)))
+
+(defun apigee-man-api-get-api-revision-deployments (organization api revision)
+  "Get deployment details of API REVISION from ORGANIZATION."
+  (apigee-man-api--request (format "organizations/%s/apis/%s/revisions/%d/deployments"
+                                   organization api revision)))
+
+(defun apigee-man-api-get-api-deployments-in-environment (organization environment api)
+  "Get deployment details of all API revision in ENVIRONMENT from ORGANIZATION."
+  (apigee-man-api--request (format "organizations/%s/environments/%s/apis/%s/deployments"
+                                   organization environment api)))
 
 (defun apigee-man-api-deploy-api-revision (organization
                                            environment
